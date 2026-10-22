@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#1A56DB">
+<title>Gepato-AI — Belgilash Interfeysi</title>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --blue:   #1A56DB;
+    --green:  #10B981;
+    --red:    #EF4444;
+    --yellow: #F59E0B;
+    --text:   #030213;
+    --muted:  #6B7280;
+    --bg:     #F9FAFB;
+    --white:  #FFFFFF;
+    --border: #E5E7EB;
+    --r-card: 12px; --r-btn: 8px; --r-badge: 100px;
+    --shadow: 0 1px 3px rgba(0,0,0,0.08);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family:'Geist',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
+
+  /* ── Layout ─────────────────────────────────────────────── */
+  .layout { display:grid; grid-template-columns:300px 1fr; min-height:100vh; }
+  @media(max-width:768px){ .layout{ grid-template-columns:1fr; } .sidebar{ display:none; } }
+
+  /* ── Sidebar ────────────────────────────────────────────── */
+  .sidebar {
+    background:var(--white); border-right:1px solid var(--border);
+    padding:16px; display:flex; flex-direction:column; gap:12px;
+  }
+  .sidebar-title { font-size:16px; font-weight:600; padding:8px 0; border-bottom:1px solid var(--border); }
+  .queue-item {
+    padding:12px; border:1px solid var(--border); border-radius:var(--r-btn);
+    cursor:pointer; transition:all 0.15s; background:var(--white);
+  }
+  .queue-item:hover { border-color:var(--blue); background:#F0F5FF; }
+  .queue-item.active { border-color:var(--blue); background:#EEF2FF; }
+  .queue-item.labeled-he { border-left:3px solid var(--red); }
+  .queue-item.labeled-no { border-left:3px solid var(--green); }
+  .queue-item.labeled-uncertain { border-left:3px solid var(--yellow); }
+  .q-name { font-size:13px; font-weight:500; }
+  .q-date { font-size:11px; color:var(--muted); }
+  .q-badge { display:inline-flex; align-items:center; gap:4px; padding:2px 7px; border-radius:var(--r-badge); font-size:11px; font-weight:500; margin-top:4px; }
+  .q-high   { background:#FEF2F2; color:#991B1B; }
+  .q-medium { background:#FFFBEB; color:#92400E; }
+  .q-low    { background:#ECFDF5; color:#065F46; }
+  .q-unlabeled { background:#F3F4F6; color:#4B5563; }
+
+  /* ── Main content ────────────────────────────────────────── */
+  .main { padding:24px; overflow-y:auto; }
+  .main-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; }
+  .main-title  { font-size:20px; font-weight:600; }
+  .progress-info { font-size:13px; color:var(--muted); }
+
+  /* ── Cards ──────────────────────────────────────────────── */
+  .card {
+    background:var(--white); border:1px solid var(--border);
+    border-radius:var(--r-card); box-shadow:var(--shadow); padding:20px;
+    margin-bottom:16px;
+  }
+  .card-title { font-size:15px; font-weight:600; margin-bottom:12px; }
+  .card-grid  { display:grid; gap:12px; }
+  .card-grid-2 { grid-template-columns:1fr 1fr; }
+  .card-grid-3 { grid-template-columns:1fr 1fr 1fr; }
+
+  /* ── Metric tiles ────────────────────────────────────────── */
+  .metric-tile {
+    background:var(--bg); border-radius:var(--r-btn); padding:12px;
+    border:1px solid var(--border);
+  }
+  .metric-name { font-size:11px; color:var(--muted); font-weight:500; text-transform:uppercase; letter-spacing:0.4px; }
+  .metric-val  { font-size:22px; font-weight:600; margin:4px 0 2px; }
+  .metric-sub  { font-size:11px; color:var(--muted); }
+  .val-normal  { color:var(--green); }
+  .val-warn    { color:var(--yellow); }
+  .val-danger  { color:var(--red); }
+
+  /* ── Feature bars ────────────────────────────────────────── */
+  .feature-row { display:flex; align-items:center; gap:10px; padding:6px 0; border-bottom:1px solid var(--bg); }
+  .feature-row:last-child { border-bottom:none; }
+  .feature-name { font-size:12px; color:var(--muted); min-width:120px; }
+  .feature-bar-wrap { flex:1; background:var(--bg); border-radius:3px; height:8px; overflow:hidden; }
+  .feature-bar  { height:100%; border-radius:3px; transition:width 0.4s; }
+  .feature-val  { font-size:12px; font-weight:500; min-width:48px; text-align:right; }
+  .feature-dev  { font-size:11px; min-width:52px; text-align:right; }
+  .dev-pos      { color:var(--red); }
+  .dev-neg      { color:var(--green); }
+  .dev-neutral  { color:var(--muted); }
+
+  /* ── Shap chart ──────────────────────────────────────────── */
+  .shap-row { display:flex; align-items:center; gap:8px; padding:5px 0; }
+  .shap-label { font-size:12px; min-width:130px; color:var(--text); }
+  .shap-bar-pos { height:16px; background:#FEE2E2; border-radius:0 3px 3px 0; }
+  .shap-bar-neg { height:16px; background:#DCFCE7; border-radius:3px 0 0 3px; }
+  .shap-value { font-size:11px; color:var(--muted); min-width:40px; }
+
+  /* ── Labeling actions ────────────────────────────────────── */
+  .label-card {
+    background:var(--white); border:1px solid var(--border);
+    border-radius:var(--r-card); padding:20px; position:sticky; bottom:0;
+    box-shadow:0 -2px 12px rgba(0,0,0,0.06);
+  }
+  .label-title { font-size:13px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:0.4px; margin-bottom:12px; }
+  .label-he-grade { display:grid; grid-template-columns:repeat(5,1fr); gap:8px; margin-bottom:12px; }
+  .grade-btn {
+    padding:10px 6px; border:1px solid var(--border); border-radius:var(--r-btn);
+    cursor:pointer; text-align:center; font-family:inherit; background:var(--white);
+    font-size:13px; font-weight:500; transition:all 0.15s;
+  }
+  .grade-btn:hover { border-color:var(--blue); background:#F0F5FF; }
+  .grade-btn.selected { background:var(--blue); color:#fff; border-color:var(--blue); }
+  .grade-btn.grade-0  .grade-dot { background:#10B981; }
+  .grade-btn.grade-1  .grade-dot { background:#84cc16; }
+  .grade-btn.grade-2  .grade-dot { background:#F59E0B; }
+  .grade-btn.grade-3  .grade-dot { background:#EF4444; }
+  .grade-btn.grade-4  .grade-dot { background:#7F1D1D; }
+  .grade-dot { width:8px; height:8px; border-radius:50%; margin:0 auto 4px; }
+  .grade-label { font-size:11px; }
+
+  .note-area {
+    width:100%; padding:10px; border:1px solid var(--border); border-radius:var(--r-btn);
+    font-family:inherit; font-size:13px; color:var(--text); resize:none; margin-bottom:12px;
+    background:var(--bg);
+  }
+  .note-area:focus { outline:none; border-color:var(--blue); background:var(--white); }
+
+  .label-actions { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; }
+  .btn {
+    padding:10px 16px; border-radius:var(--r-btn); border:1px solid var(--border);
+    font-family:inherit; font-size:14px; font-weight:500; cursor:pointer; transition:all 0.15s;
+    display:flex; align-items:center; justify-content:center; gap:6px;
+  }
+  .btn-primary { background:var(--blue); color:#fff; border-color:var(--blue); }
+  .btn-primary:hover { background:#1748c0; }
+  .btn-danger  { background:var(--red); color:#fff; border-color:var(--red); }
+  .btn-warn    { background:var(--yellow); color:#fff; border-color:var(--yellow); }
+  .btn-ghost   { background:transparent; color:var(--muted); }
+  .btn:disabled { opacity:0.45; cursor:not-allowed; }
+  .btn:active:not(:disabled) { transform:scale(0.97); }
+
+  /* ── Trend mini chart ────────────────────────────────────── */
+  .trend-canvas-wrap { width:100%; height:80px; position:relative; }
+
+  /* ── Stats bar top ───────────────────────────────────────── */
+  .stats-row { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:20px; }
+  .stat-card { background:var(--white); border:1px solid var(--border); border-radius:var(--r-card); padding:14px 16px; }
+  .stat-val  { font-size:24px; font-weight:600; }
+  .stat-lbl  { font-size:12px; color:var(--muted); margin-top:2px; }
+
+  /* ── Toast ───────────────────────────────────────────────── */
+  .toast { position:fixed; bottom:20px; right:20px; background:var(--text); color:#fff; padding:10px 16px; border-radius:var(--r-badge); font-size:13px; opacity:0; transition:opacity 0.25s; pointer-events:none; z-index:100; }
+  .toast.show { opacity:1; }
+
+  /* ── Empty state ─────────────────────────────────────────── */
+  .empty-state { text-align:center; padding:60px 20px; color:var(--muted); }
+  .empty-icon  { font-size:48px; margin-bottom:12px; }
+
+  /* ── Audio player ────────────────────────────────────────── */
+  .audio-section { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:12px; }
+  .audio-btn { padding:6px 12px; border-radius:var(--r-btn); border:1px solid var(--border); font-size:12px; cursor:pointer; font-family:inherit; background:var(--white); }
+  .audio-btn.playing { background:#EEF2FF; border-color:var(--blue); color:var(--blue); }
+
+  .badge { display:inline-flex; align-items:center; gap:4px; padding:3px 8px; border-radius:var(--r-badge); font-size:11px; font-weight:500; }
+  .badge-uncertain { background:#F3F4F6; color:#4B5563; }
+  .badge-he  { background:#FEF2F2; color:#991B1B; }
+  .badge-no  { background:#ECFDF5; color:#065F46; }
+</style>
+</head>
+<body>
+
+<div class="layout">
+  <!-- ── Sidebar: labeling queue ───────────────────────────── -->
+  <div class="sidebar">
+    <div class="sidebar-title">
+      Belgilash navbati
+      <span class="badge badge-uncertain" id="queue-count">0 ta</span>
+    </div>
+    <div id="queue-list"></div>
+  </div>
+
+  <!-- ── Main content ──────────────────────────────────────── -->
+  <div class="main">
+    <!-- Stats row -->
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-val" id="stat-total">0</div>
+        <div class="stat-lbl">Jami belgilangan</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val" id="stat-he">0</div>
+        <div class="stat-lbl">HE tasdiqlangan</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val" id="stat-no-he">0</div>
+        <div class="stat-lbl">HE yo'q</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val" id="stat-queue">0</div>
+        <div class="stat-lbl">Navbatda</div>
+      </div>
+    </div>
+
+    <!-- Main area: empty or record detail -->
+    <div id="empty-state" class="empty-state">
+      <div class="empty-icon">🗂️</div>
+      <div style="font-size:16px;font-weight:500;margin-bottom:6px">Navbatdan yozuv tanlang</div>
+      <div style="font-size:13px">Chap tomondagi ro'yhatdan yozuvni bosing</div>
+    </div>
+
+    <div id="record-detail" style="display:none">
+
+      <!-- Patient info + HE Index -->
+      <div class="main-header">
+        <div>
+          <div class="main-title" id="detail-name"></div>
+          <div style="font-size:13px;color:var(--muted)" id="detail-meta"></div>
+        </div>
+        <div id="detail-he-badge" class="q-badge"></div>
+      </div>
+
+      <!-- Scores grid -->
+      <div class="card-grid card-grid-3" style="margin-bottom:16px">
+        <div class="metric-tile">
+          <div class="metric-name">HE Index</div>
+          <div class="metric-val" id="d-he-idx">—</div>
+          <div class="metric-sub">Composite</div>
+        </div>
+        <div class="metric-tile">
+          <div class="metric-name">Model Skori</div>
+          <div class="metric-val" id="d-model-score">—</div>
+          <div class="metric-sub">XGBoost P(HE)</div>
+        </div>
+        <div class="metric-tile">
+          <div class="metric-name">Confidence</div>
+          <div class="metric-val" id="d-confidence">—</div>
+          <div class="metric-sub">Ishonch darajasi</div>
+        </div>
+      </div>
+
+      <!-- Audio playback -->
+      <div class="card">
+        <div class="card-title">🎙️ Ovoz yozuvlari</div>
+        <div class="audio-section" id="audio-section">
+          <button class="audio-btn" id="btn-play-vowel" onclick="Lab.playAudio('vowel')">▶ "Aaaa" tovush</button>
+          <button class="audio-btn" id="btn-play-text"  onclick="Lab.playAudio('text')">▶ Matn o'qish</button>
+          <span style="font-size:12px;color:var(--muted)" id="audio-status">—</span>
+        </div>
+        <canvas id="waveform-canvas" width="600" height="60" style="width:100%;height:60px;border-radius:6px;background:var(--bg)"></canvas>
+      </div>
+
+      <!-- Acoustic features -->
+      <div class="card">
+        <div class="card-title">📊 Akustik xususiyatlar</div>
+        <div id="features-list"></div>
+      </div>
+
+      <!-- SHAP chart -->
+      <div class="card">
+        <div class="card-title">🔍 Model izohi (SHAP)</div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:10px">Qizil = HE xavfini oshiradi, Yashil = kamaytiradi</div>
+        <div id="shap-chart"></div>
+      </div>
+
+      <!-- 7-day trend -->
+      <div class="card">
+        <div class="card-title">📈 7 kunlik trend</div>
+        <div class="trend-canvas-wrap">
+          <canvas id="trend-mini" width="600" height="80" style="width:100%;height:80px"></canvas>
+        </div>
+        <div style="display:flex;gap:16px;margin-top:8px">
+          <span style="font-size:12px;color:var(--muted)">Slope: <b id="trend-slope-val">—</b></span>
+          <span style="font-size:12px;color:var(--muted)">Prognoz (3k): <b id="trend-pred-val">—</b></span>
+        </div>
+      </div>
+
+      <!-- Labeling panel -->
+      <div class="label-card">
+        <div class="label-title">West-Haven darajasini belgilang</div>
+        <div class="label-he-grade" id="grade-btns">
+          <button class="grade-btn grade-0" onclick="Lab.selectGrade(0)">
+            <div class="grade-dot"></div><div class="grade-label">Grade 0</div><div style="font-size:11px;color:var(--muted)">Normal</div>
+          </button>
+          <button class="grade-btn grade-1" onclick="Lab.selectGrade(1)">
+            <div class="grade-dot"></div><div class="grade-label">Grade 1</div><div style="font-size:11px;color:var(--muted)">Minimal</div>
+          </button>
+          <button class="grade-btn grade-2" onclick="Lab.selectGrade(2)">
+            <div class="grade-dot"></div><div class="grade-label">Grade 2</div><div style="font-size:11px;color:var(--muted)">Klinik</div>
+          </button>
+          <button class="grade-btn grade-3" onclick="Lab.selectGrade(3)">
+            <div class="grade-dot"></div><div class="grade-label">Grade 3</div><div style="font-size:11px;color:var(--muted)">Og'ir</div>
+          </button>
+          <button class="grade-btn grade-4" onclick="Lab.selectGrade(4)">
+            <div class="grade-dot"></div><div class="grade-label">Grade 4</div><div style="font-size:11px;color:var(--muted)">Koma</div>
+          </button>
+        </div>
+        <textarea class="note-area" id="clinician-note" rows="2" placeholder="Klinik izoh (ixtiyoriy): bemorning holati, tashxis asosi…"></textarea>
+        <div class="label-actions">
+          <button class="btn btn-danger"   onclick="Lab.submitLabel('he')" id="btn-label-he" disabled>
+            🔴 HE tasdiqlash
+          </button>
+          <button class="btn btn-warn"     onclick="Lab.submitLabel('uncertain')" id="btn-label-unc" disabled>
+            ⚠️ Aniq emas
+          </button>
+          <button class="btn btn-primary"  onclick="Lab.submitLabel('no_he')" id="btn-label-no" disabled>
+            ✅ HE yo'q
+          </button>
+        </div>
+        <div style="text-align:center;margin-top:10px">
+          <button class="btn btn-ghost" onclick="Lab.skip()" style="font-size:13px;padding:6px 12px;border:none">
+            → Keyingisi
+          </button>
+        </div>
+      </div>
+
+    </div><!-- /record-detail -->
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+// Fetch from real API
+    async function loadQueue() {
+      try {
+        const token = localStorage.getItem('gepato_token') || '';
+        const r = await fetch('/api/predictions/labeling-queue', {
+          headers: { 'Authorization': 'Bearer ' + token }
+        });
+        if (r.ok) {
+          const data = await r.json();
+          return data.items || DEMO_RECORDS;
+        }
+      } catch(e) { console.warn('API unavailable, using demo data', e); }
+      return DEMO_RECORDS;
+    }
+    // DEMO RECORDS fallback — Real app: replace with empty []
+// ═══════════════════════════════════════════════════════════
+const DEMO_QUEUE = [
+  {
+    id:1, name:'Olimov Rustam', age:58, stage:'cirrhosis_compensated',
+    date:'2025-04-17', he_index:0.67, model_score:0.71, confidence:0.64,
+    risk_level:'high', label:null,
+    features:{ jitter_local:1.21, shimmer_local:3.89, hnr:16.8, speech_rate:3.9,
+               nhr:0.18, dvb:0.22, f0_mean:118, tremor_index:0.28, pause_rate:3.2 },
+    deviations:{ jitter_local:+1.8, shimmer_local:+1.5, hnr:-2.1, speech_rate:-1.9, tremor_index:+2.3 },
+    shap:{ tremor_index:+0.18, jitter_local:+0.14, hnr:-0.12, speech_rate:-0.09, pause_rate:+0.07 },
+    trend_7d:[0.41,0.48,0.52,0.55,0.60,0.63,0.67],
+    trend_slope: 0.043,
+  },
+  {
+    id:2, name:'Yusupova Nilufar', age:45, stage:'fibrosis_advanced',
+    date:'2025-04-17', he_index:0.38, model_score:0.42, confidence:0.34,
+    risk_level:'medium', label:null,
+    features:{ jitter_local:0.81, shimmer_local:2.70, hnr:21.5, speech_rate:4.7,
+               nhr:0.09, dvb:0.08, f0_mean:205, tremor_index:0.12, pause_rate:1.8 },
+    deviations:{ jitter_local:+0.9, shimmer_local:+0.8, hnr:-0.3, speech_rate:-0.3, tremor_index:+0.2 },
+    shap:{ jitter_local:+0.08, pause_rate:+0.05, hnr:-0.04, speech_rate:-0.03, tremor_index:+0.02 },
+    trend_7d:[0.31,0.33,0.35,0.36,0.37,0.37,0.38],
+    trend_slope: 0.011,
+  },
+  {
+    id:3, name:'Karimov Sherzod', age:63, stage:'cirrhosis_decompensated',
+    date:'2025-04-16', he_index:0.84, model_score:0.88, confidence:0.76,
+    risk_level:'critical', label:'he',
+    features:{ jitter_local:2.10, shimmer_local:6.20, hnr:13.2, speech_rate:3.1,
+               nhr:0.31, dvb:0.40, f0_mean:102, tremor_index:0.45, pause_rate:5.8 },
+    deviations:{ jitter_local:+3.2, shimmer_local:+3.8, hnr:-4.1, speech_rate:-3.2, tremor_index:+4.5 },
+    shap:{ tremor_index:+0.28, hnr:-0.22, shimmer_local:+0.19, speech_rate:-0.15, dvb:+0.11 },
+    trend_7d:[0.55,0.60,0.65,0.70,0.76,0.80,0.84],
+    trend_slope: 0.080,
+  },
+  {
+    id:4, name:'Toshmatova Gulnora', age:39, stage:'chronic_hepatitis',
+    date:'2025-04-16', he_index:0.22, model_score:0.19, confidence:0.62,
+    risk_level:'low', label:'no_he',
+    features:{ jitter_local:0.62, shimmer_local:2.15, hnr:23.4, speech_rate:5.2,
+               nhr:0.06, dvb:0.04, f0_mean:228, tremor_index:0.07, pause_rate:1.2 },
+    deviations:{ jitter_local:-0.3, shimmer_local:-0.1, hnr:+0.4, speech_rate:+0.2, tremor_index:-0.5 },
+    shap:{ hnr:-0.06, speech_rate:-0.04, jitter_local:+0.03, tremor_index:-0.02, pause_rate:+0.01 },
+    trend_7d:[0.25,0.23,0.22,0.22,0.21,0.22,0.22],
+    trend_slope:-0.004,
+  },
+];
+
+// ═══════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════
+let State = {
+  queue: JSON.parse(JSON.stringify(DEMO_QUEUE)),
+  currentId: null,
+  selectedGrade: null,
+};
+
+// ═══════════════════════════════════════════════════════════
+// UTILS
+// ═══════════════════════════════════════════════════════════
+function showToast(msg) {
+  const t=document.getElementById('toast'); t.textContent=msg;
+  t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2200);
+}
+
+function qs(sel) { return document.querySelector(sel); }
+
+function colorForVal(val, name) {
+  const danger = ['jitter_local','shimmer_local','nhr','dvb','pause_rate','tremor_index'];
+  const invert = ['hnr','speech_rate'];
+  const high = val > 0.6;
+  if (danger.includes(name))  return high ? 'val-danger' : 'val-normal';
+  if (invert.includes(name))  return high ? 'val-normal' : 'val-warn';
+  return 'val-normal';
+}
+
+// ═══════════════════════════════════════════════════════════
+// LABELING CONTROLLER
+// ═══════════════════════════════════════════════════════════
+const Lab = {
+
+  init() {
+    this.renderQueue();
+    this.updateStats();
+    // Auto-select first unlabeled
+    const first = State.queue.find(r=>!r.label);
+    if (first) this.open(first.id);
+  },
+
+  renderQueue() {
+    const ul = document.getElementById('queue-list');
+    ul.innerHTML='';
+    const unlabeled = State.queue.filter(r=>!r.label);
+    const labeled   = State.queue.filter(r=>r.label);
+    document.getElementById('queue-count').textContent = unlabeled.length+' ta';
+
+    const render = (items, header) => {
+      if (!items.length) return;
+      const h=document.createElement('div');
+      h.style.cssText='font-size:11px;color:var(--muted);font-weight:500;padding:4px 0;text-transform:uppercase;letter-spacing:0.4px;';
+      h.textContent=header; ul.appendChild(h);
+      items.forEach(r=>{
+        const div=document.createElement('div');
+        const labelCls = r.label ? 'labeled-'+r.label.replace('_he','').replace('no','no') : '';
+        div.className = 'queue-item '+(State.currentId===r.id?'active ':'')+labelCls;
+        div.onclick   = ()=>this.open(r.id);
+        const riskBadge = r.risk_level==='critical'?'q-high':r.risk_level==='high'?'q-high':r.risk_level==='medium'?'q-medium':'q-low';
+        div.innerHTML = `
+          <div class="q-name">${r.name}</div>
+          <div class="q-date">${r.date} · ${r.stage.replace('_',' ')}</div>
+          <span class="q-badge ${riskBadge}">${r.risk_level}</span>
+          ${r.label ? `<span class="q-badge ${r.label==='he'?'badge-he':r.label==='no_he'?'badge-no':'badge-uncertain'}">${r.label}</span>` : ''}
+        `;
+        ul.appendChild(div);
+      });
+    };
+
+    render(unlabeled, 'Belgilanmagan');
+    render(labeled,   'Belgilangan');
+  },
+
+  updateStats() {
+    const q=State.queue;
+    document.getElementById('stat-total').textContent  = q.filter(r=>r.label).length;
+    document.getElementById('stat-he').textContent     = q.filter(r=>r.label==='he').length;
+    document.getElementById('stat-no-he').textContent  = q.filter(r=>r.label==='no_he').length;
+    document.getElementById('stat-queue').textContent  = q.filter(r=>!r.label).length;
+  },
+
+  open(id) {
+    State.currentId = id;
+    State.selectedGrade = null;
+    const rec = State.queue.find(r=>r.id===id);
+    if (!rec) return;
+
+    document.getElementById('empty-state').style.display='none';
+    document.getElementById('record-detail').style.display='block';
+
+    // Header
+    document.getElementById('detail-name').textContent = rec.name;
+    document.getElementById('detail-meta').textContent =
+      `${rec.age} yosh · ${rec.stage.replace(/_/g,' ')} · ${rec.date}`;
+
+    const riskColors = { low:'q-low',medium:'q-medium',high:'q-high',critical:'q-high' };
+    const badge = document.getElementById('detail-he-badge');
+    badge.className = 'q-badge '+riskColors[rec.risk_level];
+    badge.textContent = rec.risk_level + ' risk';
+
+    // Metrics
+    const fmt = v => (v*100).toFixed(1)+'%';
+    const scoreEl = document.getElementById('d-he-idx');
+    scoreEl.textContent = fmt(rec.he_index);
+    scoreEl.className = 'metric-val '+(rec.he_index>0.60?'val-danger':rec.he_index>0.40?'val-warn':'val-normal');
+    document.getElementById('d-model-score').textContent  = fmt(rec.model_score);
+    document.getElementById('d-confidence').textContent   = fmt(rec.confidence);
+
+    // Features
+    this._renderFeatures(rec);
+    // SHAP
+    this._renderShap(rec);
+    // Trend
+    this._renderTrend(rec);
+    // Waveform (simulated)
+    this._drawWaveform();
+    // Reset grade buttons
+    document.querySelectorAll('.grade-btn').forEach(b=>b.classList.remove('selected'));
+    document.getElementById('clinician-note').value='';
+    ['btn-label-he','btn-label-unc','btn-label-no'].forEach(id=>document.getElementById(id).disabled=true);
+    // If already labeled: show grade
+    if (rec.label) {
+      document.getElementById('clinician-note').value = rec.note || '';
+    }
+
+    this.renderQueue();
+  },
+
+  _renderFeatures(rec) {
+    const f=rec.features, d=rec.deviations;
+    const NAMES = {
+      jitter_local:'Jitter local (%)', shimmer_local:'Shimmer local (dB)',
+      hnr:'HNR (dB)', speech_rate:'Nutq tezligi (syl/s)',
+      nhr:'NHR', dvb:'DVB', f0_mean:'F0 o'rta (Hz)',
+      tremor_index:'Tremor indeksi', pause_rate:'Pause rate'
+    };
+    const RANGES = {
+      jitter_local:[0,3], shimmer_local:[0,8], hnr:[10,30], speech_rate:[2,7],
+      nhr:[0,0.5], dvb:[0,1], f0_mean:[80,300], tremor_index:[0,0.5], pause_rate:[0,8]
+    };
+    const el=document.getElementById('features-list'); el.innerHTML='';
+    Object.entries(f).forEach(([k,v])=>{
+      const [lo,hi]=RANGES[k]||[0,10];
+      const pct = Math.min(100, Math.max(0, (v-lo)/(hi-lo)*100));
+      const dev = d[k];
+      const isGood = ['hnr','speech_rate','f0_mean'].includes(k);
+      const barColor = isGood
+        ? (v > (lo+hi)/2 ? '#10B981' : '#EF4444')
+        : (pct > 60 ? '#EF4444' : pct > 35 ? '#F59E0B' : '#10B981');
+      const devText = dev !== undefined
+        ? (dev>0?'+':'')+dev.toFixed(1)+'σ'
+        : '';
+      const devCls = dev === undefined ? 'dev-neutral' : dev>1.5?'dev-pos':dev<-1.5?'dev-neg':'dev-neutral';
+      el.innerHTML += `
+        <div class="feature-row">
+          <span class="feature-name">${NAMES[k]||k}</span>
+          <div class="feature-bar-wrap">
+            <div class="feature-bar" style="width:${pct}%;background:${barColor}"></div>
+          </div>
+          <span class="feature-val">${typeof v==='number'?v.toFixed(2):v}</span>
+          <span class="feature-dev ${devCls}">${devText}</span>
+        </div>
+      `;
+    });
+  },
+
+  _renderShap(rec) {
+    const s=rec.shap;
+    const el=document.getElementById('shap-chart'); el.innerHTML='';
+    const maxAbs=Math.max(...Object.values(s).map(Math.abs));
+    const sorted=Object.entries(s).sort((a,b)=>Math.abs(b[1])-Math.abs(a[1]));
+    sorted.forEach(([k,v])=>{
+      const pct=Math.abs(v)/maxAbs*160;
+      const isPos=v>0;
+      const LABELS = {
+        tremor_index:'Tremor indeksi', jitter_local:'Jitter', hnr:'HNR',
+        shimmer_local:'Shimmer', speech_rate:'Nutq tezligi', pause_rate:'Pause rate',
+        dvb:'DVB', nhr:'NHR', f0_mean:'F0 o'rta'
+      };
+      el.innerHTML+=`
+        <div class="shap-row">
+          <span class="shap-label">${LABELS[k]||k}</span>
+          <div style="flex:1;display:flex;align-items:center;justify-content:${isPos?'flex-start':'flex-end'}">
+            <div class="${isPos?'shap-bar-pos':'shap-bar-neg'}" style="width:${pct}px"></div>
+          </div>
+          <span class="shap-value" style="color:${isPos?'#EF4444':'#10B981'}">${v>0?'+':''}${v.toFixed(3)}</span>
+        </div>
+      `;
+    });
+  },
+
+  _renderTrend(rec) {
+    const canvas=document.getElementById('trend-mini');
+    canvas.width=600; canvas.height=80;
+    const ctx=canvas.getContext('2d');
+    const vals=rec.trend_7d; const n=vals.length;
+    const pad=10, w=canvas.width-pad*2, h=canvas.height-pad*2;
+    const lo=Math.max(0,Math.min(...vals)-0.05), hi=Math.min(1,Math.max(...vals)+0.05);
+    const px=i=>pad+i*(w/(n-1));
+    const py=v=>pad+h-(v-lo)/(hi-lo+1e-8)*h;
+    // Grid
+    ctx.strokeStyle='#E5E7EB'; ctx.lineWidth=0.5;
+    [0.33,0.66].forEach(p=>{ const y=pad+h*p; ctx.beginPath(); ctx.moveTo(pad,y); ctx.lineTo(pad+w,y); ctx.stroke(); });
+    // Fill
+    ctx.beginPath(); ctx.moveTo(px(0),py(vals[0]));
+    vals.forEach((v,i)=>ctx.lineTo(px(i),py(v)));
+    ctx.lineTo(px(n-1),canvas.height); ctx.lineTo(px(0),canvas.height);
+    ctx.fillStyle='rgba(26,86,219,0.08)'; ctx.fill();
+    // Line
+    ctx.beginPath(); ctx.moveTo(px(0),py(vals[0]));
+    vals.forEach((v,i)=>ctx.lineTo(px(i),py(v)));
+    ctx.strokeStyle='#1A56DB'; ctx.lineWidth=2; ctx.stroke();
+    // Dots
+    vals.forEach((v,i)=>{
+      ctx.beginPath(); ctx.arc(px(i),py(v),3,0,2*Math.PI);
+      ctx.fillStyle=i===n-1?'#1A56DB':'#93C5FD'; ctx.fill();
+    });
+    // Labels
+    const days=['Du','Se','Ch','Pa','Ju','Sh','Ya'];
+    ctx.fillStyle='#9CA3AF'; ctx.font='10px Geist,sans-serif'; ctx.textAlign='center';
+    vals.forEach((_,i)=>ctx.fillText(days[i],px(i),canvas.height-2));
+
+    document.getElementById('trend-slope-val').textContent = (rec.trend_slope>0?'+':'')+(rec.trend_slope*100).toFixed(1)+'%/kun';
+    document.getElementById('trend-pred-val').textContent  = ((vals[n-1]+rec.trend_slope*3)*100).toFixed(1)+'%';
+  },
+
+  _drawWaveform() {
+    const canvas=document.getElementById('waveform-canvas');
+    canvas.width=600; canvas.height=60;
+    const ctx=canvas.getContext('2d');
+    ctx.fillStyle='#F9FAFB'; ctx.fillRect(0,0,600,60);
+    ctx.strokeStyle='#1A56DB'; ctx.lineWidth=1;
+    ctx.beginPath();
+    for(let x=0;x<600;x++){
+      const y=30+Math.sin(x/8)*12*Math.random()*1.5+Math.sin(x/3)*5*Math.random();
+      x===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+  },
+
+  playAudio(type) {
+    // Real app: fetch signed audio URL from /api/voice/{id}/audio?type={vowel|text}
+    const btn=document.getElementById('btn-play-'+type);
+    btn.classList.add('playing');
+    document.getElementById('audio-status').textContent=type==='vowel'?'▶ "Aaaa" ijroida…':'▶ Matn o'qilmoqda…';
+    setTimeout(()=>{
+      btn.classList.remove('playing');
+      document.getElementById('audio-status').textContent='✓ Tugadi';
+    }, 2500);
+  },
+
+  selectGrade(grade) {
+    State.selectedGrade = grade;
+    document.querySelectorAll('.grade-btn').forEach((b,i)=>{
+      b.classList.toggle('selected', i===grade);
+    });
+    ['btn-label-he','btn-label-unc','btn-label-no'].forEach(id=>document.getElementById(id).disabled=false);
+  },
+
+  async submitLabel(labelType) {
+    if (State.selectedGrade === null) {
+      showToast('West-Haven darajasini tanlang'); return;
+    }
+    const rec = State.queue.find(r=>r.id===State.currentId);
+    if (!rec) return;
+    const note = document.getElementById('clinician-note').value.trim();
+
+    // Update local state
+    rec.label = labelType;
+    rec.we_grade = State.selectedGrade;
+    rec.note = note;
+
+    // Real app: POST /api/labeling/submit
+    // { prediction_id, label, he_grade, clinician_note }
+    console.log('POST /api/labeling/submit', { id:rec.id, label:labelType, grade:State.selectedGrade, note });
+
+    const msgs = {
+      he:        '🔴 HE tasdiqlandi — o'quv ma'lumotiga qo'shildi',
+      no_he:     '✅ HE yo'q — belgilandi',
+      uncertain: '⚠️ Aniq emas — keyinroq qayta ko'riladi',
+    };
+    showToast(msgs[labelType]);
+    this.updateStats();
+    this.renderQueue();
+
+    // Auto-advance to next unlabeled
+    setTimeout(()=>{
+      const next = State.queue.find(r=>!r.label && r.id!==State.currentId);
+      if (next) this.open(next.id);
+    }, 500);
+  },
+
+  skip() {
+    const unlabeled = State.queue.filter(r=>!r.label);
+    const idx = unlabeled.findIndex(r=>r.id===State.currentId);
+    const next = unlabeled[(idx+1) % unlabeled.length];
+    if (next) this.open(next.id);
+  }
+};
+
+// ═══════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', ()=>Lab.init());
+</script>
+</body>
+</html>

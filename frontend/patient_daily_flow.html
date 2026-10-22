@@ -1,0 +1,1368 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="theme-color" content="#1A56DB">
+<title>Gepato-AI — Kunlik Tekshiruv</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* ── Design tokens ─────────────────────────────────────── */
+  :root {
+    --blue:    #1A56DB;
+    --green:   #10B981;
+    --red:     #EF4444;
+    --yellow:  #F59E0B;
+    --text:    #030213;
+    --muted:   #6B7280;
+    --bg:      #F9FAFB;
+    --white:   #FFFFFF;
+    --border:  #E5E7EB;
+    --r-card:  12px;
+    --r-btn:   8px;
+    --r-badge: 100px;
+    --shadow:  0 1px 3px rgba(0,0,0,0.08);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Geist', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── Layout ────────────────────────────────────────────── */
+  .app { max-width: 480px; margin: 0 auto; padding: 16px; }
+
+  /* ── Progress stepper ──────────────────────────────────── */
+  .stepper {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    margin-bottom: 24px;
+    padding: 0 4px;
+  }
+  .step-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex: 1;
+    position: relative;
+  }
+  .step-item:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    top: 14px;
+    left: 50%;
+    width: 100%;
+    height: 2px;
+    background: var(--border);
+    z-index: 0;
+  }
+  .step-item.done::after  { background: var(--green); }
+  .step-item.active::after { background: var(--border); }
+
+  .step-dot {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    background: var(--white);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 600;
+    color: var(--muted);
+    z-index: 1;
+    transition: all 0.25s;
+  }
+  .step-item.active .step-dot {
+    border-color: var(--blue);
+    background: var(--blue);
+    color: #fff;
+  }
+  .step-item.done .step-dot {
+    border-color: var(--green);
+    background: var(--green);
+    color: #fff;
+  }
+  .step-label {
+    font-size: 10px;
+    color: var(--muted);
+    margin-top: 4px;
+    text-align: center;
+    white-space: nowrap;
+  }
+  .step-item.active .step-label { color: var(--blue); font-weight: 500; }
+  .step-item.done  .step-label  { color: var(--green); }
+
+  /* ── Card ──────────────────────────────────────────────── */
+  .card {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: var(--r-card);
+    box-shadow: var(--shadow);
+    padding: 20px;
+    margin-bottom: 12px;
+  }
+  .card-title { font-size: 18px; font-weight: 600; margin-bottom: 4px; }
+  .card-sub   { font-size: 14px; color: var(--muted); margin-bottom: 16px; }
+
+  /* ── Buttons ────────────────────────────────────────────── */
+  .btn {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    width: 100%; padding: 13px 20px;
+    border: none; border-radius: var(--r-btn);
+    font-family: inherit; font-size: 15px; font-weight: 500;
+    cursor: pointer; transition: all 0.18s;
+    text-decoration: none;
+  }
+  .btn-primary  { background: var(--blue);  color: #fff; }
+  .btn-primary:hover  { background: #1748c0; }
+  .btn-primary:active { transform: scale(0.98); }
+  .btn-success  { background: var(--green); color: #fff; }
+  .btn-success:hover  { background: #0da271; }
+  .btn-danger   { background: var(--red);   color: #fff; }
+  .btn-outline  {
+    background: transparent; color: var(--blue);
+    border: 1px solid var(--blue);
+  }
+  .btn-outline:hover { background: #f0f5ff; }
+  .btn-ghost {
+    background: transparent; color: var(--muted);
+    border: 1px solid var(--border);
+  }
+  .btn-ghost:hover { background: var(--bg); }
+  .btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+  .btn-row { display: flex; gap: 10px; }
+  .btn-row .btn { flex: 1; }
+
+  /* ── Stage: IDLE ────────────────────────────────────────── */
+  #stage-idle .hero-icon {
+    width: 72px; height: 72px;
+    background: #EEF2FF;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 16px;
+    font-size: 32px;
+  }
+  #stage-idle .hero-title { text-align: center; font-size: 20px; font-weight: 600; margin-bottom: 6px; }
+  #stage-idle .hero-sub   { text-align: center; color: var(--muted); font-size: 14px; margin-bottom: 24px; }
+
+  .check-list { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+  .check-list li {
+    display: flex; align-items: center; gap: 10px;
+    font-size: 14px; color: var(--muted);
+    padding: 10px 12px;
+    background: var(--bg);
+    border-radius: var(--r-btn);
+  }
+  .check-icon { font-size: 18px; flex-shrink: 0; }
+  .check-label { font-weight: 500; color: var(--text); display: block; font-size: 14px; }
+  .check-time  { font-size: 12px; color: var(--muted); }
+
+  /* ── Stage: AMBIENT CHECK ───────────────────────────────── */
+  .noise-meter {
+    height: 8px; background: var(--bg); border-radius: 4px;
+    overflow: hidden; margin: 12px 0;
+    border: 1px solid var(--border);
+  }
+  .noise-fill {
+    height: 100%; border-radius: 4px;
+    transition: width 0.3s, background 0.3s;
+  }
+  .noise-label { font-size: 13px; color: var(--muted); text-align: center; }
+  .status-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 10px; border-radius: var(--r-badge);
+    font-size: 12px; font-weight: 500;
+  }
+  .badge-ok      { background: #ECFDF5; color: #065F46; }
+  .badge-warn    { background: #FFFBEB; color: #92400E; }
+  .badge-block   { background: #FEF2F2; color: #991B1B; }
+  .badge-wait    { background: #EFF6FF; color: #1E40AF; }
+
+  /* ── Stage: VOICE RECORD ────────────────────────────────── */
+  .voice-task {
+    background: var(--bg); border-radius: var(--r-btn);
+    padding: 14px; margin-bottom: 16px;
+    border: 1px solid var(--border);
+  }
+  .voice-task-label { font-size: 12px; font-weight: 600; color: var(--blue); margin-bottom: 6px; }
+  .voice-task-text  { font-size: 15px; line-height: 1.6; color: var(--text); }
+
+  .timer-circle {
+    width: 100px; height: 100px;
+    border-radius: 50%;
+    border: 3px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    margin: 16px auto;
+    font-size: 28px; font-weight: 600; color: var(--blue);
+    position: relative;
+  }
+  .timer-circle.recording { border-color: var(--red); color: var(--red); animation: pulse 1.4s ease-in-out infinite; }
+  .timer-circle.done      { border-color: var(--green); color: var(--green); }
+
+  @keyframes pulse { 0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,0.3)} 50%{box-shadow:0 0 0 10px rgba(239,68,68,0)} }
+
+  .waveform { display: flex; align-items: center; justify-content: center; gap: 3px; height: 40px; margin: 8px 0; }
+  .wave-bar {
+    width: 3px; background: var(--blue); border-radius: 2px;
+    transition: height 0.1s;
+  }
+  .wave-bar.active { animation: wave var(--d,0.4s) ease-in-out infinite alternate; }
+  @keyframes wave { from { height: 4px; } to { height: var(--h, 28px); } }
+
+  /* ── Stage: COGNITIVE ───────────────────────────────────── */
+  /* NCT grid */
+  .nct-grid {
+    display: grid; grid-template-columns: repeat(5,1fr);
+    gap: 8px; margin: 16px 0;
+  }
+  .nct-cell {
+    aspect-ratio: 1;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; font-weight: 600;
+    cursor: pointer; background: var(--white);
+    transition: all 0.15s;
+    user-select: none; -webkit-tap-highlight-color: transparent;
+  }
+  .nct-cell:active       { transform: scale(0.92); }
+  .nct-cell.correct      { background: #ECFDF5; border-color: var(--green); color: var(--green); }
+  .nct-cell.wrong        { background: #FEF2F2; border-color: var(--red); animation: shake 0.3s; }
+  .nct-cell.used         { opacity: 0.25; pointer-events: none; }
+  @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-4px)} 75%{transform:translateX(4px)} }
+
+  .nct-progress { text-align: center; font-size: 14px; color: var(--muted); margin-bottom: 8px; }
+  .nct-next-hint { text-align: center; font-size: 22px; font-weight: 700; color: var(--blue); margin: 8px 0; }
+
+  /* Stroop */
+  .stroop-word {
+    font-size: 48px; font-weight: 700; text-align: center;
+    padding: 24px; letter-spacing: 2px;
+    user-select: none;
+  }
+  .stroop-options { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+  .stroop-btn {
+    padding: 16px; border-radius: 10px;
+    border: 2px solid transparent; cursor: pointer;
+    font-size: 15px; font-weight: 600; color: #fff;
+    transition: transform 0.12s, box-shadow 0.12s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .stroop-btn:active { transform: scale(0.94); }
+  .stroop-btn.correct { box-shadow: 0 0 0 3px var(--green); }
+  .stroop-btn.wrong   { box-shadow: 0 0 0 3px var(--red); }
+
+  .progress-bar { height: 6px; background: var(--bg); border-radius: 3px; overflow: hidden; margin: 8px 0; border: 1px solid var(--border); }
+  .progress-fill { height: 100%; background: var(--blue); border-radius: 3px; transition: width 0.3s; }
+
+  .cog-tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+  .cog-tab  {
+    flex: 1; padding: 8px; text-align: center;
+    border: 1px solid var(--border); border-radius: 8px;
+    font-size: 13px; font-weight: 500; color: var(--muted);
+    cursor: pointer; background: var(--white);
+  }
+  .cog-tab.active { border-color: var(--blue); color: var(--blue); background: #EEF2FF; }
+  .cog-tab.done   { border-color: var(--green); color: var(--green); background: #ECFDF5; }
+
+  /* ── Stage: TREMOR ──────────────────────────────────────── */
+  .tremor-visual {
+    width: 120px; height: 120px;
+    border-radius: 50%;
+    border: 3px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    margin: 16px auto;
+    font-size: 48px;
+    transition: border-color 0.3s;
+  }
+  .tremor-visual.capturing { border-color: var(--blue); animation: pulse-blue 1.6s ease-in-out infinite; }
+  @keyframes pulse-blue { 0%,100%{box-shadow:0 0 0 0 rgba(26,86,219,0.2)} 50%{box-shadow:0 0 0 12px rgba(26,86,219,0)} }
+
+  .accel-bars { display: flex; gap: 6px; align-items: flex-end; height: 48px; justify-content: center; margin: 8px 0; }
+  .accel-bar { width: 12px; border-radius: 3px 3px 0 0; transition: height 0.1s; }
+
+  /* ── Stage: RESULTS ─────────────────────────────────────── */
+  .he-gauge {
+    width: 200px; margin: 0 auto 20px;
+    position: relative;
+  }
+  .he-gauge canvas { width: 100%; }
+  .he-gauge-label {
+    position: absolute; bottom: 0; left: 50%;
+    transform: translateX(-50%);
+    text-align: center;
+  }
+  .he-index-value { font-size: 36px; font-weight: 700; }
+  .he-index-sub   { font-size: 12px; color: var(--muted); }
+
+  .component-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 0; border-bottom: 1px solid var(--bg);
+  }
+  .component-row:last-child { border-bottom: none; }
+  .comp-label { font-size: 14px; font-weight: 500; }
+  .comp-sub   { font-size: 12px; color: var(--muted); }
+  .comp-score { font-size: 16px; font-weight: 600; }
+
+  .risk-banner {
+    border-radius: var(--r-card); padding: 14px 16px;
+    display: flex; align-items: flex-start; gap: 12px;
+    margin-bottom: 16px;
+  }
+  .risk-icon { font-size: 24px; flex-shrink: 0; }
+  .risk-title { font-size: 15px; font-weight: 600; margin-bottom: 2px; }
+  .risk-desc  { font-size: 13px; }
+  .risk-low      { background: #ECFDF5; color: #065F46; }
+  .risk-medium   { background: #FFFBEB; color: #92400E; }
+  .risk-high     { background: #FEF3C7; color: #78350F; }
+  .risk-critical { background: #FEF2F2; color: #991B1B; }
+
+  .trend-card {
+    background: var(--bg); border-radius: var(--r-btn);
+    padding: 12px; margin-top: 12px;
+    border: 1px solid var(--border);
+  }
+  .trend-title { font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .trend-row   { display: flex; justify-content: space-between; font-size: 13px; padding: 3px 0; }
+
+  /* ── Toast ──────────────────────────────────────────────── */
+  .toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    background: var(--text); color: #fff;
+    padding: 10px 18px; border-radius: var(--r-badge);
+    font-size: 13px; white-space: nowrap;
+    opacity: 0; transition: opacity 0.25s;
+    pointer-events: none; z-index: 1000;
+  }
+  .toast.show { opacity: 1; }
+
+  /* ── Spinner ────────────────────────────────────────────── */
+  .spinner {
+    width: 24px; height: 24px;
+    border: 2px solid rgba(255,255,255,0.35);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Utility ────────────────────────────────────────────── */
+  .hidden  { display: none !important; }
+  .text-center { text-align: center; }
+  .mb-8  { margin-bottom: 8px; }
+  .mb-16 { margin-bottom: 16px; }
+  .mt-16 { margin-top: 16px; }
+  .text-sm { font-size: 13px; color: var(--muted); }
+  .flex-between { display: flex; justify-content: space-between; align-items: center; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ── Header ──────────────────────────────────────────── -->
+  <div class="flex-between mb-16">
+    <div>
+      <div style="font-size:18px;font-weight:600">Gepato-AI</div>
+      <div id="header-date" class="text-sm"></div>
+    </div>
+    <div id="patient-badge" class="status-badge badge-wait">Yuklanmoqda…</div>
+  </div>
+
+  <!-- ── Stepper ─────────────────────────────────────────── -->
+  <div class="stepper" id="stepper">
+    <div class="step-item active" data-step="0">
+      <div class="step-dot">1</div>
+      <div class="step-label">Muhit</div>
+    </div>
+    <div class="step-item" data-step="1">
+      <div class="step-dot">2</div>
+      <div class="step-label">Ovoz</div>
+    </div>
+    <div class="step-item" data-step="2">
+      <div class="step-dot">3</div>
+      <div class="step-label">Kognitiv</div>
+    </div>
+    <div class="step-item" data-step="3">
+      <div class="step-dot">4</div>
+      <div class="step-label">Tremor</div>
+    </div>
+    <div class="step-item" data-step="4">
+      <div class="step-dot">✓</div>
+      <div class="step-label">Natija</div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════ -->
+  <!-- STAGE 0: IDLE                                          -->
+  <!-- ══════════════════════════════════════════════════════ -->
+  <div id="stage-idle">
+    <div class="card">
+      <div class="hero-icon">🩺</div>
+      <div class="hero-title">Bugungi tekshiruv</div>
+      <div class="hero-sub">Taxminan 5 daqiqa. Ovoz, diqqat va tremor testlari.</div>
+      <ul class="check-list" style="margin-bottom:20px">
+        <li>
+          <span class="check-icon">🎙️</span>
+          <div>
+            <span class="check-label">Ovoz yozuvi</span>
+            <span class="check-time">~90 soniya</span>
+          </div>
+        </li>
+        <li>
+          <span class="check-icon">🧠</span>
+          <div>
+            <span class="check-label">Kognitiv test (NCT + Stroop)</span>
+            <span class="check-time">~2 daqiqa</span>
+          </div>
+        </li>
+        <li>
+          <span class="check-icon">📱</span>
+          <div>
+            <span class="check-label">Tremor o'lchovi</span>
+            <span class="check-time">~30 soniya</span>
+          </div>
+        </li>
+      </ul>
+      <button class="btn btn-primary" onclick="App.startFlow()">
+        Boshlash →
+      </button>
+    </div>
+    <div id="last-result-summary" class="card hidden">
+      <div class="flex-between mb-8">
+        <div style="font-size:14px;font-weight:500">Kecha natija</div>
+        <div id="last-result-date" class="text-sm"></div>
+      </div>
+      <div id="last-he-display" style="font-size:24px;font-weight:700;color:var(--blue)">—</div>
+      <div class="text-sm">HE Index</div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════ -->
+  <!-- STAGE 1: AMBIENT CHECK                                 -->
+  <!-- ══════════════════════════════════════════════════════ -->
+  <div id="stage-ambient" class="hidden">
+    <div class="card">
+      <div class="card-title">Muhit tekshiruvi</div>
+      <div class="card-sub">Atrofdagi shovqin darajasi aniqlanmoqda…</div>
+
+      <div id="ambient-checking">
+        <div style="text-align:center;padding:16px 0">
+          <div style="font-size:40px;margin-bottom:8px">🎧</div>
+          <div id="ambient-status-text" class="text-sm">Mikrofon tekshirilmoqda…</div>
+        </div>
+        <div class="noise-meter">
+          <div class="noise-fill" id="noise-fill" style="width:0%;background:var(--green)"></div>
+        </div>
+        <div class="noise-label" id="noise-db-label">— dBFS</div>
+      </div>
+
+      <div id="ambient-result" class="hidden">
+        <div id="ambient-badge" class="status-badge badge-ok" style="margin:0 auto 12px;display:flex;width:fit-content">
+          <span id="ambient-badge-icon">✓</span>
+          <span id="ambient-badge-text">Muhit yaxshi</span>
+        </div>
+        <div id="ambient-advice" class="text-sm text-center mb-16"></div>
+        <div class="btn-row">
+          <button class="btn btn-ghost" onclick="App.recheckAmbient()">Qayta tekshir</button>
+          <button class="btn btn-primary" id="ambient-continue-btn" onclick="App.toVoice()">Davom →</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════ -->
+  <!-- STAGE 2: VOICE RECORDING                               -->
+  <!-- ══════════════════════════════════════════════════════ -->
+  <div id="stage-voice" class="hidden">
+    <div class="card">
+      <div class="card-title" id="voice-stage-title">Ovoz yozuvi (1/2)</div>
+      <div class="card-sub" id="voice-stage-sub">Qulay, tinch joyda turing</div>
+
+      <!-- Task A: Sustained vowel -->
+      <div id="voice-task-a">
+        <div class="voice-task">
+          <div class="voice-task-label">TOPSHIRIQ</div>
+          <div class="voice-task-text">«Aaaaaa» tovushini uzatib, bir tekis aytib turing. Nafas olguncha davom eting.</div>
+        </div>
+        <div class="timer-circle" id="voice-timer-a">10</div>
+        <div class="waveform" id="waveform-a">
+          <div class="wave-bar" style="--h:8px;--d:0.3s;height:8px"></div>
+          <div class="wave-bar" style="--h:20px;--d:0.4s;height:8px"></div>
+          <div class="wave-bar" style="--h:32px;--d:0.35s;height:8px"></div>
+          <div class="wave-bar" style="--h:24px;--d:0.45s;height:8px"></div>
+          <div class="wave-bar" style="--h:36px;--d:0.38s;height:8px"></div>
+          <div class="wave-bar" style="--h:28px;--d:0.42s;height:8px"></div>
+          <div class="wave-bar" style="--h:16px;--d:0.33s;height:8px"></div>
+        </div>
+        <div id="voice-a-status" class="text-sm text-center mb-16">Boshlash uchun tugmani bosing</div>
+        <button class="btn btn-primary" id="btn-record-a" onclick="App.Voice.toggleA()">
+          🎙️ Yozishni boshlash
+        </button>
+      </div>
+
+      <!-- Task B: Text reading -->
+      <div id="voice-task-b" class="hidden">
+        <div class="voice-task">
+          <div class="voice-task-label">MATNNI O'QING</div>
+          <div class="voice-task-text" id="reading-text">
+            Bugun ob-havo juda yaxshi. Men o'zimni yaxshi his qilyapman. Shifokorim bilan gaplashdim. U menga dorilarni vaqtida ichishni tavsiya qildi.
+          </div>
+        </div>
+        <div class="timer-circle" id="voice-timer-b">25</div>
+        <div class="waveform" id="waveform-b">
+          <div class="wave-bar" style="--h:12px;--d:0.28s;height:8px"></div>
+          <div class="wave-bar" style="--h:26px;--d:0.36s;height:8px"></div>
+          <div class="wave-bar" style="--h:18px;--d:0.42s;height:8px"></div>
+          <div class="wave-bar" style="--h:34px;--d:0.31s;height:8px"></div>
+          <div class="wave-bar" style="--h:22px;--d:0.44s;height:8px"></div>
+          <div class="wave-bar" style="--h:30px;--d:0.38s;height:8px"></div>
+          <div class="wave-bar" style="--h:14px;--d:0.35s;height:8px"></div>
+        </div>
+        <div id="voice-b-status" class="text-sm text-center mb-16">Boshlash uchun tugmani bosing</div>
+        <button class="btn btn-primary" id="btn-record-b" onclick="App.Voice.toggleB()">
+          🎙️ Yozishni boshlash
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════ -->
+  <!-- STAGE 3: COGNITIVE                                     -->
+  <!-- ══════════════════════════════════════════════════════ -->
+  <div id="stage-cognitive" class="hidden">
+    <div class="card">
+      <div class="cog-tabs">
+        <div class="cog-tab active" id="tab-nct">NCT-A</div>
+        <div class="cog-tab" id="tab-stroop">Stroop</div>
+      </div>
+
+      <!-- NCT-A panel -->
+      <div id="panel-nct">
+        <div class="card-title">Raqamlarni toping</div>
+        <div class="card-sub">1 dan 25 gacha tartib bilan bosing</div>
+
+        <div class="flex-between mb-8">
+          <div class="nct-progress">Keyingi: <span id="nct-next" class="nct-next-hint">1</span></div>
+          <div id="nct-timer-display" class="text-sm">⏱ <span id="nct-elapsed">0</span>s</div>
+        </div>
+        <div class="progress-bar">
+          <div class="progress-fill" id="nct-progress-fill" style="width:0%"></div>
+        </div>
+        <div class="nct-grid" id="nct-grid"></div>
+        <div id="nct-error-display" class="text-sm text-center" style="color:var(--red)"></div>
+      </div>
+
+      <!-- Stroop panel -->
+      <div id="panel-stroop" class="hidden">
+        <div class="flex-between mb-8">
+          <div class="text-sm">Sinov <span id="stroop-current">1</span>/<span id="stroop-total">60</span></div>
+          <div class="text-sm">Xato: <span id="stroop-errors">0</span></div>
+        </div>
+        <div class="progress-bar mb-16">
+          <div class="progress-fill" id="stroop-progress-fill" style="width:0%"></div>
+        </div>
+
+        <div class="stroop-word" id="stroop-word">QIZIL</div>
+        <div class="stroop-options" id="stroop-options"></div>
+
+        <div id="stroop-feedback" class="text-sm text-center mt-16" style="height:20px"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════ -->
+  <!-- STAGE 4: TREMOR                                        -->
+  <!-- ══════════════════════════════════════════════════════ -->
+  <div id="stage-tremor" class="hidden">
+    <div class="card">
+      <div class="card-title">Tremor o'lchovi</div>
+      <div class="card-sub" id="tremor-instruction">Telefoni ikkala qo'lingizda ushlab, oldingizga uzating</div>
+
+      <div class="tremor-visual" id="tremor-visual">📱</div>
+
+      <div class="accel-bars" id="accel-bars">
+        <div class="accel-bar" id="bar-x" style="height:20px;background:#1A56DB"></div>
+        <div class="accel-bar" id="bar-y" style="height:20px;background:#10B981"></div>
+        <div class="accel-bar" id="bar-z" style="height:20px;background:#F59E0B"></div>
+      </div>
+      <div class="text-sm text-center mb-16">
+        <span style="color:#1A56DB">■ X</span>
+        <span style="color:#10B981;margin:0 8px">■ Y</span>
+        <span style="color:#F59E0B">■ Z</span>
+      </div>
+
+      <div class="progress-bar mb-8">
+        <div class="progress-fill" id="tremor-progress-fill" style="width:0%"></div>
+      </div>
+      <div id="tremor-timer-text" class="text-sm text-center mb-16">30 soniya qoldi</div>
+
+      <button class="btn btn-primary" id="btn-tremor-start" onclick="App.Tremor.start()">
+        📱 O'lchashni boshlash
+      </button>
+      <button class="btn btn-success hidden" id="btn-tremor-done" onclick="App.toResults()">
+        Natijani ko'rish →
+      </button>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════ -->
+  <!-- STAGE 5: RESULTS                                       -->
+  <!-- ══════════════════════════════════════════════════════ -->
+  <div id="stage-results" class="hidden">
+
+    <!-- Risk banner -->
+    <div id="risk-banner" class="risk-banner risk-low">
+      <div class="risk-icon" id="risk-icon">✅</div>
+      <div>
+        <div class="risk-title" id="risk-title">Natijalar hisoblanyapti…</div>
+        <div class="risk-desc"  id="risk-desc"></div>
+      </div>
+    </div>
+
+    <!-- HE Index gauge card -->
+    <div class="card text-center">
+      <div class="card-title mb-8">HE Index</div>
+      <canvas id="gauge-canvas" width="200" height="120" style="display:block;margin:0 auto"></canvas>
+      <div style="font-size:42px;font-weight:700;margin:4px 0" id="he-index-display">—</div>
+      <div class="text-sm" id="he-risk-label">Hisoblanyapti…</div>
+    </div>
+
+    <!-- Components -->
+    <div class="card">
+      <div style="font-size:14px;font-weight:600;margin-bottom:12px">Komponentlar</div>
+      <div class="component-row">
+        <div>
+          <div class="comp-label">🎙️ Ovoz</div>
+          <div class="comp-sub">Jitter, shimmer, HNR, MFCC</div>
+        </div>
+        <div class="comp-score" id="comp-voice">—</div>
+      </div>
+      <div class="component-row">
+        <div>
+          <div class="comp-label">🧠 Kognitiv</div>
+          <div class="comp-sub">NCT + Stroop</div>
+        </div>
+        <div class="comp-score" id="comp-cognitive">—</div>
+      </div>
+      <div class="component-row">
+        <div>
+          <div class="comp-label">📱 Tremor</div>
+          <div class="comp-sub">8–12 Hz band power</div>
+        </div>
+        <div class="comp-score" id="comp-tremor">—</div>
+      </div>
+    </div>
+
+    <!-- Trend -->
+    <div class="card" id="trend-card-el">
+      <div class="flex-between mb-8">
+        <div style="font-size:14px;font-weight:600">7 kunlik trend</div>
+        <div id="trend-direction-badge" class="status-badge badge-ok">—</div>
+      </div>
+      <canvas id="trend-canvas" width="400" height="100" style="width:100%;height:100px"></canvas>
+      <div class="trend-card">
+        <div class="trend-row">
+          <span class="text-sm">Slope (7 kun)</span>
+          <span id="trend-slope" class="text-sm" style="font-weight:500">—</span>
+        </div>
+        <div class="trend-row">
+          <span class="text-sm">Bazaviy chiziq</span>
+          <span id="trend-baseline" class="text-sm" style="font-weight:500">—</span>
+        </div>
+        <div class="trend-row">
+          <span class="text-sm">Prognoz (3 kun)</span>
+          <span id="trend-pred3" class="text-sm" style="font-weight:500">—</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="card" id="clinical-action-card" style="display:none">
+      <div style="font-size:13px;font-weight:600;color:var(--muted);margin-bottom:6px">KLINIK TAVSIYA</div>
+      <div id="clinical-action-text" style="font-size:14px;line-height:1.6"></div>
+    </div>
+
+    <button class="btn btn-outline mb-16" onclick="App.resetFlow()">
+      ← Bosh sahifa
+    </button>
+  </div>
+
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+// CONFIG
+// ═══════════════════════════════════════════════════════════
+const API_BASE = window.API_BASE || '';
+const PATIENT_ID = window.PATIENT_ID || 1;
+
+// ═══════════════════════════════════════════════════════════
+// STATE MACHINE
+// ═══════════════════════════════════════════════════════════
+const STAGES = ['ambient','voice','cognitive','tremor','results'];
+let State = {
+  stage: -1,   // -1 = idle
+  disease_stage: 'unknown',
+  // Collected data
+  ambient: null,
+  voiceA: null,   // sustained vowel blob
+  voiceB: null,   // text reading blob
+  nctResult: null,
+  stroopResult: null,
+  tremorSamples: [],
+  // Computed scores
+  voiceScore: null,
+  cogScore: null,
+  tremorScore: null,
+  heIndex: null,
+  trendResult: null,
+};
+
+// ═══════════════════════════════════════════════════════════
+// UTILITIES
+// ═══════════════════════════════════════════════════════════
+function showToast(msg, duration=2400) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), duration);
+}
+
+function setStage(name) {
+  document.getElementById('stage-idle').classList.add('hidden');
+  STAGES.forEach(s => document.getElementById('stage-'+s).classList.add('hidden'));
+  if (name === 'idle') {
+    document.getElementById('stage-idle').classList.remove('hidden');
+  } else {
+    document.getElementById('stage-'+name).classList.remove('hidden');
+  }
+  // Update stepper
+  const idx = STAGES.indexOf(name);
+  document.querySelectorAll('.step-item').forEach((el,i) => {
+    el.classList.remove('active','done');
+    if (i < idx) el.classList.add('done');
+    else if (i === idx) el.classList.add('active');
+  });
+  State.stage = idx;
+}
+
+function qs(sel) { return document.querySelector(sel); }
+
+// ═══════════════════════════════════════════════════════════
+// HEADER
+// ═══════════════════════════════════════════════════════════
+function initHeader() {
+  const d = new Date();
+  const opts = { weekday:'long', day:'numeric', month:'long' };
+  document.getElementById('header-date').textContent =
+    d.toLocaleDateString('uz-Latn-UZ', opts);
+  // Simulated patient load
+  setTimeout(() => {
+    document.getElementById('patient-badge').textContent = 'Bemor #' + PATIENT_ID;
+    document.getElementById('patient-badge').className = 'status-badge badge-ok';
+    // Show last result if exists
+    const last = JSON.parse(localStorage.getItem('gepato_last_result') || 'null');
+    if (last) {
+      document.getElementById('last-result-summary').classList.remove('hidden');
+      document.getElementById('last-he-display').textContent =
+        (last.heIndex * 100).toFixed(1) + '%';
+      document.getElementById('last-result-date').textContent = last.date;
+    }
+  }, 600);
+}
+
+// ═══════════════════════════════════════════════════════════
+// APP CONTROLLER
+// ═══════════════════════════════════════════════════════════
+const App = {
+  startFlow() { setStage('ambient'); App.Ambient.start(); },
+  toVoice()   { setStage('voice');   App.Voice.init(); },
+  toCognitive() { setStage('cognitive'); App.Cognitive.init(); },
+  toTremor()  { setStage('tremor'); },
+  async toResults() { setStage('results'); await App.Results.render(); },
+  resetFlow() { State = { ...State, stage:-1, voiceA:null, voiceB:null, nctResult:null, stroopResult:null, tremorSamples:[], voiceScore:null, cogScore:null, tremorScore:null, heIndex:null }; setStage('idle'); },
+
+  // ── AMBIENT ─────────────────────────────────────────────
+  Ambient: {
+    stream: null,
+    ctx: null,
+    analyser: null,
+    animId: null,
+
+    async start() {
+      document.getElementById('ambient-checking').classList.remove('hidden');
+      document.getElementById('ambient-result').classList.add('hidden');
+      try {
+        this.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        this.ctx    = new AudioContext();
+        const src   = this.ctx.createMediaStreamSource(this.stream);
+        this.analyser = this.ctx.createAnalyser();
+        this.analyser.fftSize = 256;
+        src.connect(this.analyser);
+        this._measure();
+      } catch(e) {
+        showToast('Mikrofon ruxsati berilmadi');
+        App.toVoice(); // fallback: skip check
+      }
+    },
+
+    _measure() {
+      const buf = new Float32Array(this.analyser.fftSize);
+      let maxDb = -80, samples = 0;
+      const tick = () => {
+        this.analyser.getFloatTimeDomainData(buf);
+        const rms = Math.sqrt(buf.reduce((s,v)=>s+v*v,0)/buf.length);
+        const db  = rms > 0 ? 20*Math.log10(rms) : -80;
+        if (db > maxDb) maxDb = db;
+        // UI update
+        const pct = Math.min(100, Math.max(0, (db + 60) / 60 * 100));
+        const fill = document.getElementById('noise-fill');
+        fill.style.width = pct + '%';
+        fill.style.background = db > -10 ? '#EF4444' : db > -20 ? '#F59E0B' : '#10B981';
+        document.getElementById('noise-db-label').textContent = db.toFixed(1) + ' dBFS';
+        samples++;
+        if (samples < 15) { this.animId = requestAnimationFrame(tick); }
+        else { this._done(maxDb); }
+      };
+      this.animId = requestAnimationFrame(tick);
+    },
+
+    _done(maxDb) {
+      if (this.stream) this.stream.getTracks().forEach(t=>t.stop());
+      document.getElementById('ambient-checking').classList.add('hidden');
+      document.getElementById('ambient-result').classList.remove('hidden');
+      State.ambient = { db: maxDb };
+
+      const badge   = document.getElementById('ambient-badge');
+      const icon    = document.getElementById('ambient-badge-icon');
+      const text    = document.getElementById('ambient-badge-text');
+      const advice  = document.getElementById('ambient-advice');
+      const contBtn = document.getElementById('ambient-continue-btn');
+
+      // ITU-T P.800: >-10 dBFS (≈55 dBSPL) = noisy
+      if (maxDb > -10) {
+        badge.className='status-badge badge-block'; icon.textContent='✕';
+        text.textContent='Shovqin juda baland'; 
+        advice.textContent='Tinchroq joyga o'ting va qayta tekshiring.';
+        contBtn.disabled = true;
+      } else if (maxDb > -20) {
+        badge.className='status-badge badge-warn'; icon.textContent='⚠';
+        text.textContent='Shovqin yuqoriroq'; 
+        advice.textContent='Yaxshiroq natija uchun tinchroq joyda o'tkazing.';
+        contBtn.disabled = false;
+      } else {
+        badge.className='status-badge badge-ok'; icon.textContent='✓';
+        text.textContent='Muhit yaxshi'; 
+        advice.textContent='Yozuv uchun qulay sharoit.';
+        contBtn.disabled = false;
+      }
+    },
+
+    async recheckAmbient() { await this.start(); }
+  },
+
+  // ── VOICE ───────────────────────────────────────────────
+  Voice: {
+    mediaRec: null,
+    chunks: [],
+    timerInterval: null,
+    taskADone: false,
+    taskBDone: false,
+
+    init() {
+      document.getElementById('voice-task-a').classList.remove('hidden');
+      document.getElementById('voice-task-b').classList.add('hidden');
+      document.getElementById('voice-stage-title').textContent = 'Ovoz yozuvi (1/2)';
+      document.getElementById('voice-stage-sub').textContent = 'Uzatilgan "Aaaa" tovush';
+    },
+
+    async _startRec(timerEl, waveformEl, statusEl, maxSec, onDone) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio:true });
+        this.chunks = [];
+        this.mediaRec = new MediaRecorder(stream);
+        this.mediaRec.ondataavailable = e => this.chunks.push(e.data);
+        this.mediaRec.onstop = () => {
+          const blob = new Blob(this.chunks, { type:'audio/webm' });
+          onDone(blob);
+          stream.getTracks().forEach(t=>t.stop());
+        };
+        this.mediaRec.start();
+
+        // Animate waveform
+        document.querySelectorAll('#'+waveformEl+' .wave-bar').forEach(b=>b.classList.add('active'));
+        timerEl.classList.add('recording');
+        statusEl.textContent = 'Yozilmoqda…';
+
+        let elapsed = 0;
+        this.timerInterval = setInterval(() => {
+          elapsed++;
+          timerEl.textContent = maxSec - elapsed;
+          if (elapsed >= maxSec) { this._stopRec(timerEl, waveformEl, statusEl); }
+        }, 1000);
+      } catch(e) { showToast('Mikrofon ruxsati kerak'); }
+    },
+
+    _stopRec(timerEl, waveformEl, statusEl) {
+      clearInterval(this.timerInterval);
+      if (this.mediaRec && this.mediaRec.state === 'recording') this.mediaRec.stop();
+      document.querySelectorAll('#'+waveformEl+' .wave-bar').forEach(b=>b.classList.remove('active'));
+      timerEl.classList.remove('recording');
+      timerEl.classList.add('done');
+      statusEl.textContent = '✓ Saqlandi';
+    },
+
+    async toggleA() {
+      const btn = document.getElementById('btn-record-a');
+      if (!this.mediaRec || this.mediaRec.state !== 'recording') {
+        btn.textContent = '⏹ To'xtatish';
+        btn.className = 'btn btn-danger';
+        await this._startRec(
+          document.getElementById('voice-timer-a'),
+          'waveform-a',
+          document.getElementById('voice-a-status'),
+          10,
+          (blob) => {
+            State.voiceA = blob; this.taskADone = true;
+            setTimeout(() => {
+              document.getElementById('voice-task-a').classList.add('hidden');
+              document.getElementById('voice-task-b').classList.remove('hidden');
+              document.getElementById('voice-stage-title').textContent = 'Ovoz yozuvi (2/2)';
+              document.getElementById('voice-stage-sub').textContent = 'Matnni o'qib bering';
+            }, 800);
+          }
+        );
+      } else {
+        this._stopRec(
+          document.getElementById('voice-timer-a'),
+          'waveform-a',
+          document.getElementById('voice-a-status')
+        );
+      }
+    },
+
+    async toggleB() {
+      const btn = document.getElementById('btn-record-b');
+      if (!this.mediaRec || this.mediaRec.state !== 'recording') {
+        btn.textContent = '⏹ To'xtatish';
+        btn.className = 'btn btn-danger';
+        await this._startRec(
+          document.getElementById('voice-timer-b'),
+          'waveform-b',
+          document.getElementById('voice-b-status'),
+          25,
+          async (blob) => {
+            State.voiceB = blob; this.taskBDone = true;
+            btn.textContent = ''; btn.disabled = true;
+            btn.innerHTML = '<div class="spinner"></div> Yuklanmoqda…';
+            // Simulated upload + feature extraction
+            await App.Voice._submit();
+          }
+        );
+      } else {
+        this._stopRec(
+          document.getElementById('voice-timer-b'),
+          'waveform-b',
+          document.getElementById('voice-b-status')
+        );
+      }
+    },
+
+    async _submit() {
+      // In real app: POST FormData to /api/voice/upload
+      // Here: simulate response
+      await new Promise(r=>setTimeout(r,1200));
+      State.voiceScore = +(Math.random()*0.35+0.15).toFixed(3);
+      showToast('Ovoz tahlil qilindi ✓');
+      setTimeout(() => App.toCognitive(), 600);
+    },
+  },
+
+  // ── COGNITIVE ───────────────────────────────────────────
+  Cognitive: {
+    nctDone: false,
+    stroopDone: false,
+
+    init() {
+      this.NCT.init();
+      this.Stroop.init();
+      document.getElementById('tab-nct').className    = 'cog-tab active';
+      document.getElementById('tab-stroop').className = 'cog-tab';
+      document.getElementById('panel-nct').classList.remove('hidden');
+      document.getElementById('panel-stroop').classList.add('hidden');
+    },
+
+    NCT: {
+      next: 1, errors: 0, startTime: null, timerInt: null,
+      nums: [],   // shuffled grid numbers
+
+      init() {
+        this.next=1; this.errors=0; this.startTime=null;
+        // Generate shuffled 1-25 grid
+        this.nums = Array.from({length:25},(_,i)=>i+1).sort(()=>Math.random()-0.5);
+        const grid = document.getElementById('nct-grid');
+        grid.innerHTML = '';
+        this.nums.forEach(n => {
+          const cell = document.createElement('div');
+          cell.className = 'nct-cell';
+          cell.textContent = n;
+          cell.dataset.num = n;
+          cell.onclick = () => this.tap(n, cell);
+          grid.appendChild(cell);
+        });
+        document.getElementById('nct-next').textContent = '1';
+        document.getElementById('nct-elapsed').textContent = '0';
+        document.getElementById('nct-progress-fill').style.width = '0%';
+        document.getElementById('nct-error-display').textContent = '';
+      },
+
+      tap(num, cell) {
+        if (!this.startTime) {
+          this.startTime = Date.now();
+          this.timerInt = setInterval(() => {
+            document.getElementById('nct-elapsed').textContent =
+              Math.floor((Date.now()-this.startTime)/1000);
+          }, 500);
+        }
+        if (num === this.next) {
+          cell.classList.add('correct');
+          setTimeout(()=>cell.classList.add('used'),300);
+          this.next++;
+          document.getElementById('nct-next').textContent = this.next;
+          document.getElementById('nct-progress-fill').style.width =
+            ((this.next-1)/25*100)+'%';
+          if (this.next > 25) this._done();
+        } else {
+          cell.classList.add('wrong');
+          this.errors++;
+          document.getElementById('nct-error-display').textContent =
+            'Xato! Keyingi: '+this.next;
+          setTimeout(()=>cell.classList.remove('wrong'),400);
+        }
+      },
+
+      _done() {
+        clearInterval(this.timerInt);
+        const totalSec = (Date.now()-this.startTime)/1000;
+        const taps = [];
+        for(let i=0;i<25;i++) taps.push(this.startTime/1000 + i*totalSec/25);
+        State.nctResult = { total_time_sec:totalSec, error_count:this.errors, tap_timestamps:taps };
+        // Simulated NCT score
+        const zScore = (totalSec - 48.7) / 12.5;
+        State.cogNctScore = Math.max(0, Math.min(1, 1/(1+Math.exp(-0.8*(zScore-1)))));
+        showToast('NCT tugadi ✓');
+        // Switch to Stroop
+        document.getElementById('tab-nct').className    = 'cog-tab done';
+        document.getElementById('tab-stroop').className = 'cog-tab active';
+        document.getElementById('panel-nct').classList.add('hidden');
+        document.getElementById('panel-stroop').classList.remove('hidden');
+        App.Cognitive.Stroop.start();
+      }
+    },
+
+    Stroop: {
+      trials: [], current: 0, errors: 0, startMs: 0,
+      COLORS: [
+        {key:'red',    label:'QIZIL',  hex:'#EF4444'},
+        {key:'blue',   label:'KO\'K',  hex:'#3B82F6'},
+        {key:'green',  label:'YASHIL', hex:'#10B981'},
+        {key:'yellow', label:'SARIQ',  hex:'#F59E0B'},
+      ],
+
+      init() { this.trials=[]; this.current=0; this.errors=0; },
+
+      start() {
+        // Generate 60 trials (30 cong + 30 incong)
+        const C=this.COLORS, T=this.trials=[]; T.length=0;
+        for(let i=0;i<30;i++){
+          const c=C[i%4];
+          T.push({condition:'congruent', word:c, ink:c, rt:0, correct:false});
+        }
+        for(let i=0;i<30;i++){
+          const w=C[i%4], others=C.filter(x=>x.key!==w.key);
+          const ink=others[i%3];
+          T.push({condition:'incongruent', word:w, ink:ink, rt:0, correct:false});
+        }
+        T.sort(()=>Math.random()-0.5);
+        document.getElementById('stroop-total').textContent=T.length;
+        this.show();
+      },
+
+      show() {
+        if (this.current >= this.trials.length) { this._done(); return; }
+        const t = this.trials[this.current];
+        const wordEl = document.getElementById('stroop-word');
+        wordEl.textContent = t.word.label;
+        wordEl.style.color = t.ink.hex;
+        document.getElementById('stroop-current').textContent = this.current+1;
+        document.getElementById('stroop-progress-fill').style.width =
+          (this.current/this.trials.length*100)+'%';
+        document.getElementById('stroop-feedback').textContent='';
+        // Options
+        const optsEl = document.getElementById('stroop-options');
+        optsEl.innerHTML='';
+        this.COLORS.forEach(c=>{
+          const btn=document.createElement('button');
+          btn.className='stroop-btn';
+          btn.textContent=c.label;
+          btn.style.background=c.hex;
+          btn.onclick=()=>this.answer(c.key, btn);
+          optsEl.appendChild(btn);
+        });
+        this.startMs = Date.now();
+        document.getElementById('stroop-errors').textContent=this.errors;
+      },
+
+      answer(key, btn) {
+        const t = this.trials[this.current];
+        t.rt = Date.now()-this.startMs;
+        t.correct = (key===t.ink.key);
+        if (!t.correct) {
+          this.errors++;
+          btn.classList.add('wrong');
+          document.getElementById('stroop-errors').textContent=this.errors;
+        } else {
+          btn.classList.add('correct');
+        }
+        this.current++;
+        setTimeout(()=>this.show(), t.correct ? 200 : 450);
+      },
+
+      _done() {
+        const T=this.trials;
+        const cong   = T.filter(t=>t.condition==='congruent');
+        const incong = T.filter(t=>t.condition==='incongruent');
+        const med = arr => { const s=[...arr].sort((a,b)=>a-b); return s[Math.floor(s.length/2)]||999; };
+        const cRt  = med(cong.filter(t=>t.rt<=3000).map(t=>t.rt));
+        const iRt  = med(incong.filter(t=>t.rt<=3000).map(t=>t.rt));
+        const effect = iRt - cRt;
+        const errRate = T.filter(t=>!t.correct).length / T.length;
+        const effNorm = Math.min(1, Math.max(0, effect/600));
+        State.stroopScore = Math.min(1, 0.65*effNorm + 0.35*errRate);
+        State.cogScore = (((State.cogNctScore||0)*0.5 + State.stroopScore*0.5));
+        State.nctResult = { ...State.nctResult };
+        State.stroopResult = { effect_ms: effect, error_rate: errRate };
+        showToast('Kognitiv test tugadi ✓');
+        setTimeout(()=>App.toTremor(), 600);
+      }
+    }
+  },
+
+  // ── TREMOR ──────────────────────────────────────────────
+  Tremor: {
+    samples: [], interval: null, progress: 0,
+
+    start() {
+      document.getElementById('btn-tremor-start').classList.add('hidden');
+      document.getElementById('tremor-visual').classList.add('capturing');
+      State.tremorSamples = [];
+      this.progress = 0;
+      const progressFill = document.getElementById('tremor-progress-fill');
+      const timerText    = document.getElementById('tremor-timer-text');
+
+      const t0 = Date.now();
+      const DURATION_MS = 30000;
+      const SR = 50; // 50 Hz
+
+      const sampleInt = setInterval(() => {
+        // Real device: DeviceMotionEvent
+        // Demo: synthetic Gaussian noise
+        const t = (Date.now()-t0)/1000;
+        const noise = (Math.random()-0.5)*0.3;
+        State.tremorSamples.push({ x:noise, y:noise*0.4, z:9.81+noise*0.2, t });
+      }, 1000/SR);
+
+      const uiInt = setInterval(() => {
+        const elapsed = Date.now()-t0;
+        const pct = Math.min(100, elapsed/DURATION_MS*100);
+        progressFill.style.width = pct+'%';
+        timerText.textContent = Math.max(0, Math.round((DURATION_MS-elapsed)/1000)) + ' soniya qoldi';
+
+        // Animate bars from recent samples
+        const recent = State.tremorSamples.slice(-5);
+        if (recent.length>0) {
+          const last = recent[recent.length-1];
+          const scale = v => Math.min(48, Math.max(4, Math.abs(v)*80+8));
+          document.getElementById('bar-x').style.height = scale(last.x)+'px';
+          document.getElementById('bar-y').style.height = scale(last.y)+'px';
+          document.getElementById('bar-z').style.height = scale(last.z-9.81)+'px';
+        }
+        if (elapsed >= DURATION_MS) {
+          clearInterval(sampleInt); clearInterval(uiInt);
+          this._done();
+        }
+      }, 200);
+    },
+
+    _done() {
+      document.getElementById('tremor-visual').classList.remove('capturing');
+      // Simulated tremor analysis
+      const rms = Math.sqrt(State.tremorSamples.reduce((s,v)=>s+v.x*v.x,0)/State.tremorSamples.length);
+      State.tremorScore = Math.min(1, rms * 6);
+      document.getElementById('btn-tremor-done').classList.remove('hidden');
+      showToast('Tremor o'lchandi ✓');
+    }
+  },
+
+  // ── RESULTS ─────────────────────────────────────────────
+  Results: {
+    async render() {
+      // Compute HE Index: voice 0.75, tremor 0.15, cognitive 0.10
+      const v = State.voiceScore    || 0.18;
+      const t = State.tremorScore   || 0.12;
+      const c = State.cogScore      || 0.20;
+      const he = Math.min(1, v*0.75 + t*0.15 + c*0.10);
+      State.heIndex = he;
+
+      // Risk level
+      const RISKS = {
+        low:      { label:'West-Haven Grade 0 — Xavf past', cls:'risk-low',      icon:'✅', color:'#10B981' },
+        medium:   { label:'West-Haven Grade 1 — Kuzatuv tavsiya', cls:'risk-medium',   icon:'⚠️', color:'#F59E0B' },
+        high:     { label:'West-Haven Grade 2 — Shifokorga murojaat', cls:'risk-high', icon:'🔶', color:'#EF4444' },
+        critical: { label:'West-Haven Grade 3–4 — Darhol baholash', cls:'risk-critical', icon:'🚨', color:'#991B1B' },
+      };
+      const lvl = he>=0.80?'critical':he>=0.60?'high':he>=0.40?'medium':'low';
+      const risk = RISKS[lvl];
+
+      // Update risk banner
+      const banner = document.getElementById('risk-banner');
+      banner.className = 'risk-banner '+risk.cls;
+      document.getElementById('risk-icon').textContent  = risk.icon;
+      document.getElementById('risk-title').textContent = lvl==='low'?'Natija normal':'Diqqat talab qilinadi';
+      document.getElementById('risk-desc').textContent  = risk.label;
+
+      // HE index display
+      document.getElementById('he-index-display').textContent = (he*100).toFixed(1)+'%';
+      document.getElementById('he-risk-label').textContent = risk.label;
+
+      // Gauge
+      this._drawGauge(he, risk.color);
+
+      // Components
+      const pct = v => (v*100).toFixed(1)+'%';
+      document.getElementById('comp-voice').textContent     = pct(v);
+      document.getElementById('comp-cognitive').textContent = pct(c);
+      document.getElementById('comp-tremor').textContent    = pct(t);
+
+      // Color components by value
+      [['comp-voice',v],['comp-cognitive',c],['comp-tremor',t]].forEach(([id,val])=>{
+        document.getElementById(id).style.color = val>0.6?'#EF4444':val>0.4?'#F59E0B':'#10B981';
+      });
+
+      // Trend (simulated from localStorage history)
+      this._renderTrend(he);
+
+      // Clinical action
+      if (lvl !== 'low') {
+        document.getElementById('clinical-action-card').style.display = '';
+        const actions = {
+          medium:   'Kuzatuvni davom ettiring. 3 kun ichida takroriy tekshiruv o'tkazing.',
+          high:     'Shifokoringiz bilan imkon qadar tezroq bog'laning. Ammiak va ALT/AST tahlili tavsiya.',
+          critical: 'DARHOL klinik baholash kerak. Kasalxona qabul bo'limlari bilan bog'laning.',
+        };
+        document.getElementById('clinical-action-text').textContent = actions[lvl] || '';
+      }
+
+      // Save to localStorage
+      const history = JSON.parse(localStorage.getItem('gepato_history')||'[]');
+      history.push({ date: new Date().toLocaleDateString(), he, v, c, t });
+      if(history.length>30) history.shift();
+      localStorage.setItem('gepato_history', JSON.stringify(history));
+      localStorage.setItem('gepato_last_result', JSON.stringify({
+        heIndex:he, date:new Date().toLocaleDateString('uz-Latn-UZ')
+      }));
+    },
+
+    _drawGauge(value, color) {
+      const canvas = document.getElementById('gauge-canvas');
+      const ctx = canvas.getContext('2d');
+      canvas.width=200; canvas.height=120;
+      const cx=100, cy=110, r=80;
+      // Background arc
+      ctx.beginPath(); ctx.arc(cx,cy,r,Math.PI,2*Math.PI);
+      ctx.strokeStyle='#E5E7EB'; ctx.lineWidth=12; ctx.stroke();
+      // Value arc
+      const angle = Math.PI + value * Math.PI;
+      ctx.beginPath(); ctx.arc(cx,cy,r,Math.PI,angle);
+      ctx.strokeStyle=color; ctx.lineWidth=12; ctx.lineCap='round'; ctx.stroke();
+      // Needle
+      const needleAngle = Math.PI + value * Math.PI;
+      ctx.beginPath();
+      ctx.moveTo(cx,cy);
+      ctx.lineTo(cx+60*Math.cos(needleAngle), cy+60*Math.sin(needleAngle));
+      ctx.strokeStyle='#030213'; ctx.lineWidth=2; ctx.lineCap='round'; ctx.stroke();
+      ctx.beginPath(); ctx.arc(cx,cy,6,0,2*Math.PI);
+      ctx.fillStyle='#030213'; ctx.fill();
+    },
+
+    _renderTrend(currentHe) {
+      const history = JSON.parse(localStorage.getItem('gepato_history')||'[]');
+      const values  = [...history.map(h=>h.he), currentHe].slice(-7);
+      if (values.length < 2) {
+        document.getElementById('trend-direction-badge').textContent='Yetarli ma\'lumot yo\'q';
+        return;
+      }
+      // Linear slope
+      const n = values.length;
+      const xBar = (n-1)/2;
+      const yBar = values.reduce((s,v)=>s+v,0)/n;
+      let num=0, den=0;
+      values.forEach((v,i)=>{ num+=(i-xBar)*(v-yBar); den+=(i-xBar)**2; });
+      const slope = den>0?num/den:0;
+
+      // Trend badge
+      const badge = document.getElementById('trend-direction-badge');
+      if (slope > 0.005)      { badge.textContent='↑ Yomonlashmoqda'; badge.className='status-badge badge-warn'; }
+      else if (slope < -0.005){ badge.textContent='↓ Yaxshilanmoqda'; badge.className='status-badge badge-ok'; }
+      else                    { badge.textContent='→ Barqaror'; badge.className='status-badge badge-ok'; }
+
+      document.getElementById('trend-slope').textContent    = (slope*100).toFixed(2)+'%/kun';
+      document.getElementById('trend-baseline').textContent = (yBar*100).toFixed(1)+'%';
+      document.getElementById('trend-pred3').textContent    = Math.min(100,(currentHe+slope*3)*100).toFixed(1)+'%';
+
+      // Draw mini trend chart
+      const canvas = document.getElementById('trend-canvas');
+      canvas.width=400; canvas.height=100;
+      const ctx=canvas.getContext('2d');
+      const pad=10, w=canvas.width-pad*2, h=canvas.height-pad*2;
+      const min=Math.max(0,Math.min(...values)-0.05), max=Math.min(1,Math.max(...values)+0.05);
+      const px=(i)=>pad+i*(w/(values.length-1));
+      const py=(v)=>pad+h-(v-min)/(max-min+1e-8)*h;
+
+      // Grid lines
+      ctx.strokeStyle='#E5E7EB'; ctx.lineWidth=0.5;
+      [0.25,0.5,0.75].forEach(pct=>{
+        const y=pad+h*pct; ctx.beginPath(); ctx.moveTo(pad,y); ctx.lineTo(pad+w,y); ctx.stroke();
+      });
+
+      // Line
+      ctx.beginPath(); ctx.moveTo(px(0),py(values[0]));
+      values.forEach((v,i)=>ctx.lineTo(px(i),py(v)));
+      ctx.strokeStyle='#1A56DB'; ctx.lineWidth=2; ctx.stroke();
+
+      // Dots
+      values.forEach((v,i)=>{
+        ctx.beginPath(); ctx.arc(px(i),py(v),3,0,2*Math.PI);
+        ctx.fillStyle=i===values.length-1?'#1A56DB':'#93C5FD'; ctx.fill();
+      });
+    }
+  }
+};
+
+// ═══════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', () => {
+  initHeader();
+  setStage('idle');
+});
+</script>
+</body>
+</html>
