@@ -65,6 +65,16 @@ app.include_router(cognitive.router,                               tags=["Cognit
 
 @app.get("/")
 async def root():
+    """Bosh sahifa: bemor / shifokor / admin paneli (frontend/index.html)."""
+    from fastapi.responses import FileResponse
+    p = frontend_dir / "index.html"
+    if p.exists():
+        return FileResponse(str(p))
+    return {"service": "Gepato-AI", "version": "2.0", "status": "running"}
+
+
+@app.get("/api/status")
+async def status():
     return {"service": "Gepato-AI", "version": "2.0", "status": "running"}
 
 @app.get("/health")
