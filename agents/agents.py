@@ -7,10 +7,13 @@ import time
 import logging
 from typing import Optional
 import anthropic
+import httpx
 from core.config import settings
 
 logger = logging.getLogger(__name__)
 client = anthropic.AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
+
+GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 
 
 # ── ATLAS — Klinik Tahlil ─────────────────────────────
@@ -79,21 +82,15 @@ async def atlas_query(
     messages.append({"role": "user", "content": user_content})
 
     try:
-        response = await client.messages.create(
-            model=settings.CLAUDE_MODEL,
-            max_tokens=1000,
-            system=ATLAS_SYSTEM,
-            messages=messages,
-        )
-
-        text = response.content[0].text
+        text, tokens, provider = await _complete(ATLAS_SYSTEM, messages)
         latency = int((time.time() - start) * 1000)
 
         return {
             "response": text,
-            "tokens_used": response.usage.input_tokens + response.usage.output_tokens,
+            "tokens_used": tokens,
             "latency_ms": latency,
             "agent": "atlas",
+            "provider": provider,
         }
 
     except Exception as e:
@@ -133,21 +130,15 @@ async def oracle_query(
     messages.append({"role": "user", "content": user_content})
 
     try:
-        response = await client.messages.create(
-            model=settings.CLAUDE_MODEL,
-            max_tokens=1000,
-            system=ORACLE_SYSTEM,
-            messages=messages,
-        )
-
-        text = response.content[0].text
+        text, tokens, provider = await _complete(ORACLE_SYSTEM, messages)
         latency = int((time.time() - start) * 1000)
 
         return {
             "response": text,
-            "tokens_used": response.usage.input_tokens + response.usage.output_tokens,
+            "tokens_used": tokens,
             "latency_ms": latency,
             "agent": "oracle",
+            "provider": provider,
         }
 
     except Exception as e:
@@ -159,6 +150,64 @@ async def oracle_query(
             "agent": "oracle",
             "error": str(e),
         }
+
+
+# ── LLM provayder: Gemini (bepul tarif) yoki Claude ──
+# AI_PROVIDER=auto: GEMINI_API_KEY bo'lsa Gemini, aks holda Claude. Birinchisi xato bersa
+# (masalan, Claude balansi tugagan), kaliti bor ikkinchisi sinab ko'riladi.
+
+def _providers() -> list:
+    have = {"gemini": bool(settings.GEMINI_API_KEY), "claude": bool(settings.ANTHROPIC_API_KEY)}
+    pref = settings.AI_PROVIDER.lower()
+    order = [pref, "gemini", "claude"] if pref in have else ["gemini", "claude"]
+    return [p for i, p in enumerate(order) if have[p] and p not in order[:i]]
+
+
+async def _complete(system: str, messages: list) -> tuple:
+    """(matn, token soni, provayder). Hech biri ishlamasa oxirgi xatoni ko'taradi."""
+    providers = _providers()
+    if not providers:
+        raise RuntimeError("AI kaliti yo'q: .env ga GEMINI_API_KEY yoki ANTHROPIC_API_KEY yozing")
+    last = None
+    for p in providers:
+        try:
+            if p == "gemini":
+                return (*await _gemini(system, messages), "gemini")
+            response = await client.messages.create(
+                model=settings.CLAUDE_MODEL, max_tokens=1000, system=system, messages=messages,
+            )
+            return (response.content[0].text,
+                    response.usage.input_tokens + response.usage.output_tokens, "claude")
+        except Exception as e:  # noqa: BLE001 — keyingi provayderga o'tamiz
+            logger.warning(f"{p} xatosi: {e}")
+            last = e
+    raise last
+
+
+async def _gemini(system: str, messages: list) -> tuple:
+    contents = [
+        {"role": "model" if m.get("role") == "assistant" else "user",
+         "parts": [{"text": str(m.get("content", ""))}]}
+        for m in messages
+    ]
+    gen = {"maxOutputTokens": 1500}
+    if settings.GEMINI_MODEL.startswith("gemini-2.5"):
+        gen["thinkingConfig"] = {"thinkingBudget": 0}  # 2.5 "o'ylash"ga token sarflamasin
+    async with httpx.AsyncClient(timeout=60) as http:
+        r = await http.post(
+            GEMINI_URL.format(model=settings.GEMINI_MODEL),
+            headers={"x-goog-api-key": settings.GEMINI_API_KEY},
+            json={"systemInstruction": {"parts": [{"text": system}]},
+                  "contents": contents, "generationConfig": gen},
+        )
+    if r.status_code != 200:
+        raise RuntimeError(f"Gemini {r.status_code}: {r.text[:300]}")
+    data = r.json()
+    parts = (data.get("candidates") or [{}])[0].get("content", {}).get("parts", [])
+    text = "".join(x.get("text", "") for x in parts).strip()
+    if not text:
+        raise RuntimeError(f"Gemini bo'sh javob: {str(data)[:300]}")
+    return text, int(data.get("usageMetadata", {}).get("totalTokenCount", 0))
 
 
 # ── Kontekst formatlash ────────────────────────────────

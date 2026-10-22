@@ -764,7 +764,7 @@ async function sendAI(){
         method:'POST',headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
         body:JSON.stringify({question:msg,patient_id:selPt.id})
       });
-      if(r.ok){const d=await r.json();resp=d.response;}
+      if(r.ok){const d=await r.json();if(!d.error)resp=d.response;}
     }
   }catch(e){}
   if(!resp){
@@ -779,7 +779,9 @@ async function sendAI(){
 function addMsg(txt,isUser){
   const c=document.getElementById('aiMsgs');if(!c)return;
   const d=document.createElement('div');d.className='ai-msg';
-  const f=txt.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/_(.*?)_/g,'<em>$1</em>').replace(/\n/g,'<br>');
+  const esc=txt.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');  // AI matni HTML sifatida bajarilmasin
+  const f=esc.replace(/^#{1,6}\s*(.+)$/gm,'<strong>$1</strong>').replace(/^[ \t]*[-*][ \t]+/gm,'• ')
+    .replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/(^|\s)_([^_\n]+)_(?=\s|$)/g,'$1<em>$2</em>').replace(/\n/g,'<br>');
   d.innerHTML=isUser
     ?`<div style="flex:1"></div><div class="ai-bubble user">${f}</div>`
     :`<div style="width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,var(--blue),var(--green));display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0">🧠</div><div class="ai-bubble">${f}</div>`;

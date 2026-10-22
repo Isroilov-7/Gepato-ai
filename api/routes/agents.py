@@ -77,7 +77,7 @@ async def _build_patient_context(patient_id: int, db: AsyncSession) -> dict:
         "hnr": feat.hnr if feat else None,
         "speech_rate": feat.speech_rate if feat else None,
         "tremor_index": feat.tremor_index if feat else None,
-        "ammonia": patient.bilirubin,
+        "ammonia": patient.ammonia_level,
         "bilirubin": patient.bilirubin,
         "inr": patient.inr,
         "lactulose_dose": patient.lactulose_dose,

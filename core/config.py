@@ -23,6 +23,9 @@ class Settings(BaseSettings):
     # AI
     ANTHROPIC_API_KEY: str = ""
     CLAUDE_MODEL: str = "claude-sonnet-4-5"
+    GEMINI_API_KEY: str = ""
+    GEMINI_MODEL: str = "gemini-2.5-flash"
+    AI_PROVIDER: str = "auto"  # auto | gemini | claude
 
     # Audio
     UPLOAD_DIR: str = "uploads"
