@@ -6,7 +6,9 @@
 <title>Gepato-AI — Telemedicine Platform</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="vendor/chart.umd.js"></script>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 64 64%27%3E%3Crect width=%2764%27 height=%2764%27 rx=%2714%27 fill=%27%231A56DB%27/%3E%3Ctext x=%2732%27 y=%2743%27 font-size=%2730%27 text-anchor=%27middle%27 fill=%27white%27 font-family=%27Arial%27 font-weight=%27700%27%3EG%3C/text%3E%3C/svg%3E">
+<meta name="description" content="Gepato-AI — jigar ensefalopatiyasini ovoz, kognitiv test va mikro-tremor orqali masofadan kuzatish platformasi">
 <style>
 :root {
   --blue:#1A56DB; --blue-d:#1547B8; --blue-l:#EBF5FF;
@@ -39,9 +41,15 @@ body{font-family:var(--font);color:var(--text);background:var(--bg);-webkit-font
 .l-inner{text-align:center;width:100%;max-width:860px}
 .l-title{font-size:clamp(40px,7vw,72px);font-weight:800;color:#fff;margin-bottom:16px;letter-spacing:-2px;line-height:1.05}
 .l-sub{font-size:20px;color:rgba(255,255,255,.9);margin-bottom:64px}
-.l-cards{display:grid;grid-template-columns:1fr 1fr;gap:24px;max-width:720px;margin:0 auto}
+.l-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;max-width:860px;margin:0 auto}
+.l-stats{display:flex;justify-content:center;gap:48px;flex-wrap:wrap;margin-top:44px;color:#fff}
+.l-stat b{display:block;font-size:30px;font-weight:800;letter-spacing:-.5px}
+.l-stat span{display:block;font-size:11px;font-weight:600;letter-spacing:.8px;text-transform:uppercase;opacity:.8;margin-top:2px}
+.li-dark{background:#374151}
+.demo-pill{display:none;font-size:11px;font-weight:600;color:#92400E;background:#FEF3C7;border:1px solid #FDE68A;border-radius:999px;padding:4px 10px;white-space:nowrap}
+body.demo .demo-pill{display:inline-block}
 .l-card{
-  background:#fff;border-radius:28px;padding:48px 32px;cursor:pointer;
+  background:#fff;border-radius:24px;padding:36px 24px;cursor:pointer;
   box-shadow:var(--sh-2xl);transition:all .22s;
   display:flex;flex-direction:column;align-items:center;gap:18px;
 }
@@ -106,7 +114,7 @@ body{font-family:var(--font);color:var(--text);background:var(--bg);-webkit-font
 .ps-pct{font-size:15px;font-weight:700}
 
 /* Main content */
-.d-main{flex:1;overflow-y:auto;padding:24px;display:flex;flex-direction:column;gap:20px}
+.d-main{flex:1;min-width:0;overflow-y:auto;padding:24px;display:flex;flex-direction:column;gap:20px}
 
 /* Patient header */
 .pt-hdr{
@@ -118,8 +126,8 @@ body{font-family:var(--font);color:var(--text);background:var(--bg);-webkit-font
 .pt-badge{padding:12px 24px;border-radius:12px;color:#fff;font-size:16px;font-weight:700;white-space:nowrap}
 
 /* Charts */
-.ch-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
-.ch-card{background:#fff;border-radius:var(--r-lg);padding:20px;box-shadow:var(--sh)}
+.ch-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.ch-card{min-width:0;background:#fff;border-radius:var(--r-lg);padding:20px;box-shadow:var(--sh)}
 .ch-title{font-size:16px;font-weight:600;margin-bottom:16px}
 .ch-wrap{height:200px;position:relative}
 .ch-legend{display:flex;gap:16px;margin-top:12px;font-size:13px;color:var(--text2)}
@@ -331,6 +339,8 @@ body{font-family:var(--font);color:var(--text);background:var(--bg);-webkit-font
 /* Responsive */
 @media(max-width:900px){
   .l-cards{grid-template-columns:1fr}
+  .l-stats{gap:24px}
+  .l-stat b{font-size:24px}
   .d-body{flex-direction:column}
   .ps{width:100%;height:260px}
   .ch-grid{grid-template-columns:1fr}
@@ -347,21 +357,29 @@ body{font-family:var(--font);color:var(--text);background:var(--bg);-webkit-font
 <div id="landing" class="view active">
   <div class="l-inner">
     <h1 class="l-title">Gepato-AI</h1>
-    <p class="l-sub">Multimodal Telemedicine Platform for Hepatic Encephalopathy</p>
+    <p class="l-sub">Jigar ensefalopatiyasi uchun multimodal telemeditsina platformasi</p>
     <div class="l-cards">
       <div class="l-card" onclick="go('patient')">
         <div class="l-icon li-blue">📊</div>
-        <h2>Patient Portal</h2>
-        <p>Access your daily tests and track your progress</p>
+        <h2>Bemor Portali</h2>
+        <p>Kunlik testlar va ovoz yozishni boshlang</p>
       </div>
       <div class="l-card" onclick="go('doctor')">
         <div class="l-icon li-green">🧠</div>
-        <h2>Doctor Dashboard</h2>
-        <p>Monitor patients and analyze AI predictions</p>
+        <h2>Shifokor Paneli</h2>
+        <p>Bemorlarni kuzating va AI bashoratlarini tahlil qiling</p>
+      </div>
+      <div class="l-card" onclick="go('admin')">
+        <div class="l-icon li-dark">⚙️</div>
+        <h2>Admin Panel</h2>
+        <p>Tizim va model boshqaruvi</p>
       </div>
     </div>
-    <div style="margin-top:32px">
-      <button onclick="go('admin')" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;padding:10px 28px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:var(--font);transition:background .2s">⚙️ Admin Panel</button>
+    <div class="l-stats">
+      <div class="l-stat"><b>85–92%</b><span>Sezgirlik (adabiyot)</span></div>
+      <div class="l-stat"><b>15 sek</b><span>Kunlik test vaqti</span></div>
+      <div class="l-stat"><b>23 ta</b><span>Akustik biomarker</span></div>
+      <div class="l-stat"><b>~$0</b><span>Qo'shimcha uskunasiz</span></div>
     </div>
   </div>
 </div>
@@ -369,9 +387,9 @@ body{font-family:var(--font);color:var(--text);background:var(--bg);-webkit-font
 <!-- ══ DOCTOR DASHBOARD ══ -->
 <div id="doctor" class="view">
   <div class="d-topbar">
-    <h1>Gepato-AI Professor Dashboard</h1>
+    <h1>Gepato-AI — Shifokor Paneli <span class="demo-pill">Demo rejim · namunaviy ma'lumotlar</span></h1>
     <div class="d-topbar-r">
-      <div class="icon-btn" onclick="showToast('🔔','2 ta yangi alert','Aliyev va Karimov uchun')">🔔<div class="notif-dot"></div></div>
+      <div class="icon-btn" onclick="showToast('🔔','3 ta yuqori xavf','Aliyev, Karimov va Rustamov — 24 soat ichida ko\'rib chiqing')">🔔<div class="notif-dot"></div></div>
       <button class="back-btn" onclick="go('landing')">← Chiqish</button>
     </div>
   </div>
@@ -379,10 +397,10 @@ body{font-family:var(--font);color:var(--text);background:var(--bg);-webkit-font
     <!-- Patient list -->
     <div class="ps">
       <div class="ps-hdr">
-        <h2>Patients</h2>
+        <h2>Bemorlar</h2>
         <div class="sw">
           <span class="sw-icon">🔍</span>
-          <input placeholder="Search patients..." oninput="filterPts(this.value)">
+          <input placeholder="Qidirish..." oninput="filterPts(this.value)">
         </div>
       </div>
       <div class="ps-list" id="ptList"></div>
@@ -397,7 +415,7 @@ body{font-family:var(--font);color:var(--text);background:var(--bg);-webkit-font
   <div class="mob-wrap">
     <!-- Home -->
     <div class="mob-home" id="mobHome">
-      <div class="mob-greet">Hello, Muhammadali!</div>
+      <div class="mob-greet">Xush kelibsiz!</div>
       <div class="plant-area">
         <svg width="200" height="220" viewBox="0 0 200 220">
           <rect x="60" y="160" width="80" height="50" rx="8" fill="#D97706"/>
@@ -411,11 +429,11 @@ body{font-family:var(--font);color:var(--text);background:var(--bg);-webkit-font
           <ellipse cx="100" cy="55" rx="12" ry="18" fill="#34D399"/>
         </svg>
       </div>
-      <button class="start-btn" onclick="startTest()">Start Daily Test</button>
+      <button class="start-btn" onclick="startTest()">Bugungi testni boshlash</button>
     </div>
     <!-- Voice -->
     <div class="mob-screen" id="voiScreen">
-      <div class="voi-instr">Please read the text below aloud.</div>
+      <div class="voi-instr">Mikrofonni bosing va matnni ovoz chiqarib o'qing</div>
       <div class="mic-wrap">
         <div class="ripple" id="rip1"></div>
         <div class="ripple" id="rip2"></div>
@@ -424,17 +442,17 @@ body{font-family:var(--font);color:var(--text);background:var(--bg);-webkit-font
       <div class="rec-timer" id="recTimer">00:00</div>
       <div class="voi-card">
         <div class="voi-text">Bugun ob-havo juda yaxshi.</div>
-        <div class="voi-sub">(Today the weather is very good)</div>
+        <div class="voi-sub">(3 soniya yoziladi)</div>
       </div>
-      <div class="rec-lbl" id="recLbl">Recording...</div>
+      <div class="rec-lbl" id="recLbl">Yozilmoqda...</div>
     </div>
     <!-- Stroop -->
     <div class="mob-screen" id="strScreen">
-      <div class="str-instr">Select the color of the text, not the word.</div>
-      <div class="str-word" id="strWord" style="color:#1A56DB">YELLOW</div>
+      <div class="str-instr">So'zning ma'nosini emas, <b>rangini</b> tanlang</div>
+      <div class="str-word" id="strWord" style="color:#1A56DB">SARIQ</div>
       <div class="str-btns">
-        <button class="str-btn" style="background:#EF4444" onclick="strAns('red')">Red</button>
-        <button class="str-btn" style="background:#1A56DB" onclick="strAns('blue')">Blue</button>
+        <button class="str-btn" style="background:#EF4444" onclick="strAns('red')">Qizil</button>
+        <button class="str-btn" style="background:#1A56DB" onclick="strAns('blue')">Ko'k</button>
       </div>
       <div class="str-res" id="strRes"></div>
     </div>
@@ -455,9 +473,9 @@ body{font-family:var(--font);color:var(--text);background:var(--bg);-webkit-font
       <div class="succ-title">Test yakunlandi!</div>
       <div class="succ-sub">Barcha natijalar shifokoringizga yuborildi. Ertaga qaytib keling!</div>
       <div class="succ-stats">
-        <div><div class="ss-val">87%</div><div class="ss-lbl">HE Risk Indeksi</div></div>
-        <div><div class="ss-val">4.2</div><div class="ss-lbl">Jitter</div></div>
-        <div><div class="ss-val">8.9</div><div class="ss-lbl">Shimmer</div></div>
+        <div><div class="ss-val">24%</div><div class="ss-lbl">HE xavf indeksi</div></div>
+        <div><div class="ss-val">0.7%</div><div class="ss-lbl">Jitter</div></div>
+        <div><div class="ss-val">2.2%</div><div class="ss-lbl">Shimmer</div></div>
       </div>
       <button class="succ-btn" onclick="go('landing')">← Asosiy sahifaga</button>
     </div>
@@ -467,7 +485,7 @@ body{font-family:var(--font);color:var(--text);background:var(--bg);-webkit-font
 <!-- ══ ADMIN ══ -->
 <div id="admin" class="view">
   <div class="adm-topbar">
-    <h1>Admin Panel</h1>
+    <h1>Admin Panel <span class="demo-pill">Demo rejim · namunaviy ma'lumotlar</span></h1>
     <div style="display:flex;gap:10px">
       <button class="adm-btn outline" onclick="go('landing')">← Chiqish</button>
     </div>
@@ -476,7 +494,7 @@ body{font-family:var(--font);color:var(--text);background:var(--bg);-webkit-font
     <div class="adm-stats">
       <div class="adm-stat blue"><div class="adm-stat-lbl">Jami bemorlar</div><div class="adm-stat-val">55</div><div class="adm-stat-sub">↑ 3 bu oy</div></div>
       <div class="adm-stat green"><div class="adm-stat-lbl">Bugungi yozuvlar</div><div class="adm-stat-val">41</div><div class="adm-stat-sub">74% faollik</div></div>
-      <div class="adm-stat yellow"><div class="adm-stat-lbl">Model aniqligi</div><div class="adm-stat-val">87%</div><div class="adm-stat-sub">↑ 2% oxirgi train</div></div>
+      <div class="adm-stat yellow"><div class="adm-stat-lbl">Model aniqligi</div><div class="adm-stat-val">87%</div><div class="adm-stat-sub">↑ 2% so'nggi trening</div></div>
       <div class="adm-stat red"><div class="adm-stat-lbl">Faol alertlar</div><div class="adm-stat-val">2</div><div class="adm-stat-sub">Kutilmoqda</div></div>
     </div>
     <div class="adm-grid2">
@@ -491,14 +509,14 @@ body{font-family:var(--font);color:var(--text);background:var(--bg);-webkit-font
       </div>
       <div class="adm-card">
         <h3>Model ishlashi</h3>
-        <div class="metr-row"><div class="metr-name">Sensitivity</div><div class="metr-bar"><div class="metr-fill" style="width:87%;background:var(--green)"></div></div><div class="metr-pct">87%</div></div>
-        <div class="metr-row"><div class="metr-name">Specificity</div><div class="metr-bar"><div class="metr-fill" style="width:83%;background:var(--blue)"></div></div><div class="metr-pct">83%</div></div>
+        <div class="metr-row"><div class="metr-name">Sezgirlik</div><div class="metr-bar"><div class="metr-fill" style="width:87%;background:var(--green)"></div></div><div class="metr-pct">87%</div></div>
+        <div class="metr-row"><div class="metr-name">Spetsifiklik</div><div class="metr-bar"><div class="metr-fill" style="width:83%;background:var(--blue)"></div></div><div class="metr-pct">83%</div></div>
         <div class="metr-row"><div class="metr-name">AUC-ROC</div><div class="metr-bar"><div class="metr-fill" style="width:91%;background:var(--blue)"></div></div><div class="metr-pct">91%</div></div>
         <div class="metr-row"><div class="metr-name">F1-Score</div><div class="metr-bar"><div class="metr-fill" style="width:85%;background:var(--green)"></div></div><div class="metr-pct">85%</div></div>
         <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap">
           <button class="adm-btn primary" onclick="showToast('🧠','Retrain boshlandi','Yangi 41 namuna bilan...')">🧠 Qayta trening</button>
           <button class="adm-btn outline" onclick="showToast('📥','Eksport','model_v1.5.pkl yuklanmoqda')">📥 Eksport</button>
-          <button class="adm-btn danger" onclick="showToast('↩','Qaytarildi','Avvalgi versiyaga')">↩ Rollback</button>
+          <button class="adm-btn danger" onclick="showToast('↩','Qaytarildi','Avvalgi versiyaga')">↩ Qaytarish</button>
         </div>
       </div>
     </div>
@@ -545,25 +563,27 @@ let token = localStorage.getItem('gepato_token') || '';
 // ─── PATIENTS DATA (demo + real dan) ───
 const PTS = [
   {id:1,name:'Aliyev Sardor',age:58,cls:'C',risk:'high',pct:94.5,lactulose:'30ml TID',ammonia:142,bili:4.2,
-   voice:[{d:'Mon',j:2.8,s:6.2},{d:'Tue',j:3.1,s:6.8},{d:'Wed',j:3.5,s:7.1},{d:'Thu',j:3.9,s:7.5},{d:'Fri',j:4.2,s:8.0},{d:'Sat',j:4.5,s:8.4},{d:'Sun',j:4.8,s:8.9}],
+   voice:[{d:'Du',j:2.8,s:6.2},{d:'Se',j:3.1,s:6.8},{d:'Ch',j:3.5,s:7.1},{d:'Pa',j:3.9,s:7.5},{d:'Ju',j:4.2,s:8.0},{d:'Sh',j:4.5,s:8.4},{d:'Ya',j:4.8,s:8.9}],
    stroop:[820,890,950,1020,1150,1280,1350],tremor:[.5,.8,1.2,1.5,1.8,2.1,2.4,2.7,2.9,3.2,3.5,3.8,4.0,4.2,4.5]},
   {id:2,name:'Karimov Jahongir',age:62,cls:'C',risk:'high',pct:91.2,lactulose:'20ml TID',ammonia:138,bili:3.9,
-   voice:[{d:'Mon',j:2.5,s:5.8},{d:'Tue',j:2.9,s:6.3},{d:'Wed',j:3.2,s:6.7},{d:'Thu',j:3.6,s:7.2},{d:'Fri',j:3.9,s:7.6},{d:'Sat',j:4.1,s:8.0},{d:'Sun',j:4.4,s:8.3}],
+   voice:[{d:'Du',j:2.5,s:5.8},{d:'Se',j:2.9,s:6.3},{d:'Ch',j:3.2,s:6.7},{d:'Pa',j:3.6,s:7.2},{d:'Ju',j:3.9,s:7.6},{d:'Sh',j:4.1,s:8.0},{d:'Ya',j:4.4,s:8.3}],
    stroop:[780,850,920,990,1080,1180,1290],tremor:[.4,.7,1.0,1.3,1.6,1.9,2.2,2.5,2.8,3.0,3.3,3.6,3.9,4.1,4.3]},
   {id:3,name:'Rustamov Aziz',age:55,cls:'C',risk:'high',pct:89.7,lactulose:'25ml TID',ammonia:135,bili:3.7,
-   voice:[{d:'Mon',j:2.3,s:5.5},{d:'Tue',j:2.7,s:6.0},{d:'Wed',j:3.0,s:6.4},{d:'Thu',j:3.4,s:6.9},{d:'Fri',j:3.7,s:7.3},{d:'Sat',j:4.0,s:7.7},{d:'Sun',j:4.2,s:8.0}],
+   voice:[{d:'Du',j:2.3,s:5.5},{d:'Se',j:2.7,s:6.0},{d:'Ch',j:3.0,s:6.4},{d:'Pa',j:3.4,s:6.9},{d:'Ju',j:3.7,s:7.3},{d:'Sh',j:4.0,s:7.7},{d:'Ya',j:4.2,s:8.0}],
    stroop:[750,820,880,960,1050,1140,1230],tremor:[.3,.6,.9,1.2,1.5,1.8,2.1,2.4,2.7,2.9,3.2,3.5,3.7,3.9,4.0]},
-  {id:4,name:'Patient 4',age:52,cls:'B',risk:'warning',pct:72.6,lactulose:'15ml BID',ammonia:92,bili:2.4,
-   voice:[{d:'Mon',j:1.8,s:4.2},{d:'Tue',j:1.9,s:4.4},{d:'Wed',j:2.0,s:4.6},{d:'Thu',j:2.1,s:4.8},{d:'Fri',j:2.2,s:5.0},{d:'Sat',j:2.3,s:5.2},{d:'Sun',j:2.4,s:5.4}],
+  {id:4,name:'Yusupova Dilnoza',age:48,cls:'B',risk:'warning',pct:72.6,lactulose:'15ml BID',ammonia:92,bili:2.4,
+   voice:[{d:'Du',j:1.8,s:4.2},{d:'Se',j:1.9,s:4.4},{d:'Ch',j:2.0,s:4.6},{d:'Pa',j:2.1,s:4.8},{d:'Ju',j:2.2,s:5.0},{d:'Sh',j:2.3,s:5.2},{d:'Ya',j:2.4,s:5.4}],
    stroop:[520,540,560,580,600,620,640],tremor:[.8,.9,1.0,1.1,1.2,1.3,1.4,1.5,1.6,1.7,1.8,1.9,2.0,2.1,2.2]},
-  {id:5,name:'Patient 5',age:47,cls:'B',risk:'warning',pct:66.6,lactulose:'15ml BID',ammonia:88,bili:2.1,
-   voice:[{d:'Mon',j:1.6,s:3.8},{d:'Tue',j:1.7,s:4.0},{d:'Wed',j:1.8,s:4.2},{d:'Thu',j:1.9,s:4.4},{d:'Fri',j:2.0,s:4.6},{d:'Sat',j:2.1,s:4.8},{d:'Sun',j:2.2,s:5.0}],
+  {id:5,name:'Nazarov Bobur',age:51,cls:'B',risk:'warning',pct:66.6,lactulose:'15ml BID',ammonia:88,bili:2.1,
+   voice:[{d:'Du',j:1.6,s:3.8},{d:'Se',j:1.7,s:4.0},{d:'Ch',j:1.8,s:4.2},{d:'Pa',j:1.9,s:4.4},{d:'Ju',j:2.0,s:4.6},{d:'Sh',j:2.1,s:4.8},{d:'Ya',j:2.2,s:5.0}],
    stroop:[480,500,520,540,560,580,600],tremor:[.6,.7,.8,.9,1.0,1.1,1.2,1.3,1.4,1.5,1.6,1.7,1.8,1.9,2.0]},
 ];
+// Barqaror bemorlar — har ochilganda bir xil (Math.random emas: taqdimotda raqamlar sakramasin)
+const STABLE_PCT=[27.1,32.4,37.9,26.0,24.0,36.8,32.8,25.4,22.3,30.2];
 for(let i=6;i<=15;i++){
-  PTS.push({id:i,name:'Patient '+i,age:40+i,cls:'A',risk:'stable',
-    pct:+(20+Math.random()*20).toFixed(1),lactulose:'10ml BID',ammonia:50+Math.floor(Math.random()*20),bili:+(1.2+Math.random()).toFixed(1),
-    voice:[{d:'Mon',j:.6,s:2.1},{d:'Tue',j:.6,s:2.2},{d:'Wed',j:.7,s:2.1},{d:'Thu',j:.6,s:2.3},{d:'Fri',j:.7,s:2.2},{d:'Sat',j:.6,s:2.1},{d:'Sun',j:.7,s:2.2}],
+  PTS.push({id:i,name:'Bemor '+i,age:40+i,cls:'A',risk:'stable',
+    pct:STABLE_PCT[i-6],lactulose:'10ml BID',ammonia:50+(i*7)%20,bili:+(1.2+((i*13)%10)/10).toFixed(1),
+    voice:[{d:'Du',j:.6,s:2.1},{d:'Se',j:.6,s:2.2},{d:'Ch',j:.7,s:2.1},{d:'Pa',j:.6,s:2.3},{d:'Ju',j:.7,s:2.2},{d:'Sh',j:.6,s:2.1},{d:'Ya',j:.7,s:2.2}],
     stroop:[260,255,270,258,265,260,258],tremor:[.1,.1,.2,.1,.2,.1,.1,.2,.1,.1,.2,.1,.1,.2,.1]});
 }
 
@@ -574,11 +594,19 @@ function rc(r){return r==='high'?'#EF4444':r==='warning'?'#F59E0B':'#10B981'}
 function rdc(r){return r==='high'?'rd-r':r==='warning'?'rd-y':'rd-g'}
 
 // ─── VIEW ───
-function go(id){
+const HASH={patient:'bemor',doctor:'shifokor',admin:'admin',landing:''};
+function go(id,noHash){
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
   document.getElementById(id).classList.add('active');
   if(id==='doctor'){renderPtList();renderDash()}
+  if(id==='patient')resetPatient();
+  window.scrollTo(0,0);
+  if(!noHash){const h=HASH[id]||'';if(location.hash.slice(1)!==h)history.pushState(null,'',h?'#'+h:location.pathname)}
 }
+function fromHash(){
+  const h=location.hash.slice(1);const id=Object.keys(HASH).find(k=>HASH[k]===h&&h)||'landing';go(id,true);
+}
+window.addEventListener('popstate',fromHash);
 
 // ─── PATIENT LIST ───
 function renderPtList(){
@@ -587,7 +615,7 @@ function renderPtList(){
       <div class="rd ${rdc(p.risk)}"></div>
       <div class="ps-info">
         <div class="ps-name">${p.name}</div>
-        <div class="ps-meta">Age ${p.age} • Class ${p.cls}</div>
+        <div class="ps-meta">${p.age} yosh · Sinf ${p.cls}</div>
       </div>
       <div class="ps-pct" style="color:${rc(p.risk)}">${p.pct.toFixed(1)}%</div>
     </div>`).join('');
@@ -609,52 +637,52 @@ function renderDash(){
       <div class="pt-hdr-top">
         <div>
           <div class="pt-name">${p.name}</div>
-          <div class="pt-meta">Age ${p.age} • Child-Pugh Class ${p.cls}</div>
+          <div class="pt-meta">${p.age} yosh · Child-Pugh sinfi ${p.cls}</div>
         </div>
-        <div class="pt-badge" style="background:${rbg}">AI Prediction: ${p.pct.toFixed(1)}% mHE Risk</div>
+        <div class="pt-badge" style="background:${rbg}">AI bashorat: ${p.pct.toFixed(1)}% mHE xavfi</div>
       </div>
     </div>
     <div class="ch-grid">
       <div class="ch-card">
-        <div class="ch-title">Acoustic AI Analysis</div>
+        <div class="ch-title">Akustik AI tahlili</div>
         <div class="ch-wrap"><canvas id="voiCh"></canvas></div>
         <div class="ch-legend">
-          <span><span class="leg-d" style="background:#1A56DB"></span>Jitter Anomaly</span>
-          <span><span class="leg-d" style="background:#10B981"></span>Shimmer Anomaly</span>
+          <span><span class="leg-d" style="background:#1A56DB"></span>Jitter</span>
+          <span><span class="leg-d" style="background:#10B981"></span>Shimmer</span>
         </div>
       </div>
       <div class="ch-card">
-        <div class="ch-title">Cognitive Stroop Test</div>
+        <div class="ch-title">Stroop kognitiv test</div>
         <div class="ch-wrap"><canvas id="strCh"></canvas></div>
-        <div class="ch-stat">Average delay: ${Math.round(p.stroop.reduce((a,b)=>a+b,0)/p.stroop.length)}ms</div>
+        <div class="ch-stat">O'rtacha kechikish: ${Math.round(p.stroop.reduce((a,b)=>a+b,0)/p.stroop.length)}ms</div>
       </div>
       <div class="ch-card">
-        <div class="ch-title">Micro-Tremor (Asterixis)</div>
+        <div class="ch-title">Mikro-tremor (asteriksis)</div>
         <div class="ch-wrap"><canvas id="tremCh"></canvas></div>
-        <div class="ch-stat">Peak amplitude: ${Math.max(...p.tremor).toFixed(2)}</div>
+        <div class="ch-stat">Maksimal amplituda: ${Math.max(...p.tremor).toFixed(2)}</div>
       </div>
     </div>
     <div class="trad">
-      <h3>Traditional Medical Data</h3>
+      <h3>Tibbiy ma'lumotlar</h3>
       <div class="trad-g">
-        <div><div class="trad-lbl">Lactulose Dose</div><input class="trad-inp" value="${p.lactulose}" readonly></div>
-        <div><div class="trad-lbl">Ammonia Level (μg/dL)</div><input class="trad-inp" value="${p.ammonia}" readonly></div>
+        <div><div class="trad-lbl">Laktuloza dozasi</div><input class="trad-inp" value="${p.lactulose}" readonly></div>
+        <div><div class="trad-lbl">Ammiak darajasi (μg/dL)</div><input class="trad-inp" value="${p.ammonia}" readonly></div>
         <div><div class="trad-lbl">Bilirubin (mg/dL)</div><input class="trad-inp" value="${p.bili.toFixed(1)}" readonly></div>
       </div>
     </div>
     <div class="actions">
-      <h3>Actions</h3>
+      <h3>Harakatlar</h3>
       <div class="act-row">
-        <button class="act-btn ab-blue" onclick="callPt()">📞 Call Patient</button>
-        <button class="act-btn ab-yell" onclick="adjMed()">💊 Adjust Medication</button>
-        <button class="act-btn ab-green" onclick="markRes()">✅ Mark as Resolved</button>
+        <button class="act-btn ab-blue" onclick="callPt()">📞 Qo'ng'iroq</button>
+        <button class="act-btn ab-yell" onclick="adjMed()">💊 Dori sozlash</button>
+        <button class="act-btn ab-green" onclick="markRes()">✅ Yaxshi deb belgilash</button>
       </div>
     </div>
     <div class="ai-panel">
       <div class="ai-hdr">
         <div class="ai-av">🧠</div>
         <div><div class="ai-name">Atlas — Klinik Tahlil</div></div>
-        <div class="ai-model">claude-sonnet-4</div>
+        <div class="ai-model">${token?'jonli':'demo'}</div>
         <div class="ai-live" style="margin-left:8px"></div>
       </div>
       <div class="ai-msgs" id="aiMsgs">
@@ -707,9 +735,22 @@ async function markRes(){
 // ─── AI AGENT (real API) ───
 const atlasDemo={
   default:'Bemorning ovoz va kognitiv ko\'rsatkichlarini tahlil qilaman. Qaysi bemor haqida savol?',
+  yuqori:'Hozirda 3 ta bemor yuqori xavfda:\n1. 🔴 Aliyev Sardor — 94.5%\n2. 🔴 Karimov Jahongir — 91.2%\n3. 🔴 Rustamov Aziz — 89.7%',
   aliyev:'**Aliyev Sardor** — Kritik holat:\n🔴 AI Skor: 94.5%\n📊 Jitter: 4.8% (+380%)\n📊 Shimmer: 8.9% (+197%)\n⚕️ Tavsiya: Darhol kasalxonaga.',
-  yuqori:'Hozirda 3 ta bemor:\n1. 🔴 Aliyev Sardor — 94.5%\n2. 🔴 Karimov Jahongir — 91.2%\n3. 🔴 Rustamov Aziz — 89.7%',
 };
+function atlasPatient(p){
+  const v0=p.voice[0],v1=p.voice[p.voice.length-1];
+  const jd=Math.round((v1.j-v0.j)/v0.j*100), sd=Math.round((v1.s-v0.s)/v0.s*100);
+  const sAvg=Math.round(p.stroop.reduce((a,b)=>a+b,0)/p.stroop.length), tMax=Math.max(...p.tremor);
+  const lvl=p.risk==='high'?'🔴 Yuqori xavf':p.risk==='warning'?'🟡 O\'rta xavf':'🟢 Barqaror';
+  const tav=p.risk==='high'?'Shifokor bilan 24 soat ichida bog\'lanish, ammiakni qayta tekshirish va laktuloza dozasini ko\'rib chiqish tavsiya etiladi.'
+    :p.risk==='warning'?'Kuzatuvni kuchaytirish: kunlik testlar va 1 hafta ichida qayta ko\'rik.'
+    :'Joriy rejim davom etadi, haftalik kuzatuv yetarli.';
+  return `**${p.name}** — ${lvl} (AI: ${p.pct.toFixed(1)}%)\n`+
+    `📊 Jitter: ${v1.j}% (7 kunda ${jd>=0?'+':''}${jd}%), Shimmer: ${v1.s}% (${sd>=0?'+':''}${sd}%)\n`+
+    `🧠 Stroop: o\'rtacha ${sAvg} ms\n✋ Tremor cho\'qqisi: ${tMax.toFixed(2)}\n🧪 Ammiak: ${p.ammonia} μg/dL, bilirubin: ${p.bili.toFixed(1)} mg/dL\n`+
+    `⚕️ ${tav}\n_Skrining natijasi — yakuniy qaror shifokorniki._`;
+}
 async function sendAI(){
   const inp=document.getElementById('aiInp');
   const msg=inp.value.trim();if(!msg)return;
@@ -727,8 +768,9 @@ async function sendAI(){
     }
   }catch(e){}
   if(!resp){
-    const k=Object.keys(atlasDemo).find(k=>k!=='default'&&msg.toLowerCase().includes(k));
-    resp=atlasDemo[k]||atlasDemo.default;
+    const q=msg.toLowerCase();
+    const k=Object.keys(atlasDemo).find(k=>k!=='default'&&k!=='aliyev'&&q.includes(k));
+    resp=k?atlasDemo[k]:atlasPatient(selPt);
     await new Promise(r=>setTimeout(r,1200+Math.random()*600));
   }
   removeThink();
@@ -737,7 +779,7 @@ async function sendAI(){
 function addMsg(txt,isUser){
   const c=document.getElementById('aiMsgs');if(!c)return;
   const d=document.createElement('div');d.className='ai-msg';
-  const f=txt.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');
+  const f=txt.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/_(.*?)_/g,'<em>$1</em>').replace(/\n/g,'<br>');
   d.innerHTML=isUser
     ?`<div style="flex:1"></div><div class="ai-bubble user">${f}</div>`
     :`<div style="width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,var(--blue),var(--green));display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0">🧠</div><div class="ai-bubble">${f}</div>`;
@@ -752,6 +794,14 @@ function addThink(){
 function removeThink(){document.getElementById('thinking')?.remove()}
 
 // ─── PATIENT FLOW ───
+function resetPatient(){  // portalga qayta kirilganda test boshidan boshlansin
+  clearInterval(recInt);isRec=false;
+  ['voiScreen','strScreen','tremScreen','succScreen'].forEach(id=>document.getElementById(id).classList.remove('show'));
+  document.getElementById('mobHome').style.display='';
+  ['tremDone','strRes','recLbl','recTimer'].forEach(id=>{const e=document.getElementById(id);if(e)e.style.display='none'});
+  const mb=document.getElementById('micBtn');mb.classList.remove('rec');mb.textContent='🎙';
+  ['rip1','rip2'].forEach(id=>document.getElementById(id).classList.remove('show'));
+}
 let recInt,recSec=0,isRec=false;
 function startTest(){
   document.getElementById('mobHome').style.display='none';
@@ -822,8 +872,16 @@ async function autoLogin(){
     if(r.ok){const d=await r.json();token=d.access_token;localStorage.setItem('gepato_token',token);}
   }catch(e){}
 }
-autoLogin();
+(async()=>{
+  let api=false;
+  try{const ctl=new AbortController();setTimeout(()=>ctl.abort(),2000);
+      const r=await fetch(`${API}/health`,{signal:ctl.signal});api=r.ok&&(await r.json()).status==='ok';}catch(e){}
+  if(api) await autoLogin();
+  if(!token) document.body.classList.add('demo');
+  if(document.getElementById('doctor').classList.contains('active')) renderDash();
+})();
 renderPtList();
+fromHash();
 </script>
 </body>
 </html>

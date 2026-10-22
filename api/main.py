@@ -48,6 +48,8 @@ app.add_middleware(
 frontend_dir = Path(__file__).parent.parent / "frontend"
 if frontend_dir.exists():
     app.mount("/static", StaticFiles(directory=str(frontend_dir)), name="static")
+    if (frontend_dir / "vendor").exists():  # index.html: vendor/chart.umd.js (CDN'siz)
+        app.mount("/vendor", StaticFiles(directory=str(frontend_dir / "vendor")), name="vendor")
 
 # ── Routes ────────────────────────────────────────────────────────────────
 from api.routes import auth, patients, voice, predictions, admin, agents
