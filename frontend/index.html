@@ -32,8 +32,10 @@ body{font-family:var(--font);color:var(--text);background:var(--bg);-webkit-font
 #landing{
   min-height:100vh;
   background:linear-gradient(135deg,#1A56DB 0%,#10B981 100%);
-  display:flex!important;align-items:center;justify-content:center;padding:40px 24px;
+  align-items:center;justify-content:center;padding:40px 24px;
 }
+/* #landing ID selektori .view{display:none} dan kuchli edi -> bosh sahifa hech qachon yashirinmasdi */
+#landing.active{display:flex!important}
 .l-inner{text-align:center;width:100%;max-width:860px}
 .l-title{font-size:clamp(40px,7vw,72px);font-weight:800;color:#fff;margin-bottom:16px;letter-spacing:-2px;line-height:1.05}
 .l-sub{font-size:20px;color:rgba(255,255,255,.9);margin-bottom:64px}
