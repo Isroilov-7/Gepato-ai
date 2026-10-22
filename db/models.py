@@ -90,6 +90,7 @@ class Patient(Base):
 
     # Current medication
     lactulose_dose   = Column(String(100))
+    ammonia_level    = Column(Float)   # μg/dL (API va shifokor paneli ishlatadi)
     rifaximin        = Column(Boolean, default=False)
     other_meds       = Column(Text)
 
@@ -193,6 +194,9 @@ class AcousticFeatures(Base):
     # MFCC (13 koeffitsient) — JSON array sifatida
     mfcc            = Column(JSON)    # [c1, c2, ..., c13]
     mfcc_delta      = Column(JSON)    # MFCC birinchi hosilasi
+    # 23 ta modelning to'liq feature'lari (nhr, dvb, spi, articulation_rate, ...) — alohida ustuni
+    # yo'q featurelar shu yerda; ilgari ular bashoratga 0 bo'lib kirardi
+    extra_features  = Column(JSON)
 
     # Bemorning o'z baseline'idan og'ish (% da)
     jitter_deviation   = Column(Float)

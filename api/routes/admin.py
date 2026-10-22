@@ -31,6 +31,10 @@ async def system_stats(db: AsyncSession = Depends(get_db)):
     )
     active_model = model_result.scalar_one_or_none()
 
+    # ModelVersion jadvali bo'sh bo'lsa (fayldan yuklangan model) — haqiqatda ishlayotgan versiya
+    from ml.model import get_model
+    loaded_version = get_model().version
+
     return {
         "patients_total": patients_total,
         "recordings_total": recordings_total,
@@ -38,7 +42,7 @@ async def system_stats(db: AsyncSession = Depends(get_db)):
         "alerts_pending": alerts_pending,
         "high_risk_patients": high_risk,
         "active_model": {
-            "version": active_model.version if active_model else "v1.0-pretrain",
+            "version": active_model.version if active_model else loaded_version,
             "auc_roc": active_model.auc_roc if active_model else None,
             "sensitivity": active_model.sensitivity if active_model else None,
             "train_samples": active_model.train_samples if active_model else None,
@@ -81,6 +85,14 @@ async def model_versions(db: AsyncSession = Depends(get_db)):
         select(models.ModelVersion).order_by(models.ModelVersion.created_at.desc())
     )
     versions = result.scalars().all()
+    if not versions:  # DB'da yozuv yo'q — models/ papkadagi fayllar (v0.1 … v1.5)
+        from pathlib import Path
+        from ml.model import get_model, _ver_key
+        cur = get_model().version
+        files = sorted(Path("models").glob("model_v*.pkl"), key=_ver_key, reverse=True)
+        return [{"version": f.stem.replace("model_", ""), "is_active": f.stem.replace("model_", "") == cur,
+                 "auc_roc": None, "sensitivity": None, "train_samples": None,
+                 "created_at": None, "file": f.name} for f in files]
     return [
         {
             "version": v.version,

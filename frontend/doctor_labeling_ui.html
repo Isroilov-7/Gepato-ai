@@ -333,10 +333,11 @@
         });
         if (r.ok) {
           const data = await r.json();
-          return data.items || DEMO_RECORDS;
+          if (data.items && data.items.length) { State.demo = false; return data.items; }
         }
       } catch(e) { console.warn('API unavailable, using demo data', e); }
-      return DEMO_RECORDS;
+      State.demo = true;
+      return JSON.parse(JSON.stringify(DEMO_QUEUE));
     }
     // DEMO RECORDS fallback — Real app: replace with empty []
 // ═══════════════════════════════════════════════════════════
@@ -391,6 +392,7 @@ const DEMO_QUEUE = [
 // STATE
 // ═══════════════════════════════════════════════════════════
 let State = {
+  demo: true,
   queue: JSON.parse(JSON.stringify(DEMO_QUEUE)),
   currentId: null,
   selectedGrade: null,
@@ -420,7 +422,9 @@ function colorForVal(val, name) {
 // ═══════════════════════════════════════════════════════════
 const Lab = {
 
-  init() {
+  async init() {
+    // Haqiqiy navbat (API) — bo’lmasa namunaviy ma’lumot (demo)
+    State.queue = await loadQueue();
     this.renderQueue();
     this.updateStats();
     // Auto-select first unlabeled
@@ -520,7 +524,7 @@ const Lab = {
     const NAMES = {
       jitter_local:'Jitter local (%)', shimmer_local:'Shimmer local (dB)',
       hnr:'HNR (dB)', speech_rate:'Nutq tezligi (syl/s)',
-      nhr:'NHR', dvb:'DVB', f0_mean:'F0 o'rta (Hz)',
+      nhr:'NHR', dvb:'DVB', f0_mean:'F0 o’rta (Hz)',
       tremor_index:'Tremor indeksi', pause_rate:'Pause rate'
     };
     const RANGES = {
@@ -564,7 +568,7 @@ const Lab = {
       const LABELS = {
         tremor_index:'Tremor indeksi', jitter_local:'Jitter', hnr:'HNR',
         shimmer_local:'Shimmer', speech_rate:'Nutq tezligi', pause_rate:'Pause rate',
-        dvb:'DVB', nhr:'NHR', f0_mean:'F0 o'rta'
+        dvb:'DVB', nhr:'NHR', f0_mean:'F0 o’rta'
       };
       el.innerHTML+=`
         <div class="shap-row">
@@ -631,7 +635,7 @@ const Lab = {
     // Real app: fetch signed audio URL from /api/voice/{id}/audio?type={vowel|text}
     const btn=document.getElementById('btn-play-'+type);
     btn.classList.add('playing');
-    document.getElementById('audio-status').textContent=type==='vowel'?'▶ "Aaaa" ijroida…':'▶ Matn o'qilmoqda…';
+    document.getElementById('audio-status').textContent=type==='vowel'?'▶ "Aaaa" ijroida…':'▶ Matn o’qilmoqda…';
     setTimeout(()=>{
       btn.classList.remove('playing');
       document.getElementById('audio-status').textContent='✓ Tugadi';
@@ -659,14 +663,24 @@ const Lab = {
     rec.we_grade = State.selectedGrade;
     rec.note = note;
 
-    // Real app: POST /api/labeling/submit
-    // { prediction_id, label, he_grade, clinician_note }
-    console.log('POST /api/labeling/submit', { id:rec.id, label:labelType, grade:State.selectedGrade, note });
+    // Haqiqiy ma’lumot bo’lsa — belgi serverga (Active Learning datasetiga) yoziladi
+    if (!State.demo && labelType !== 'uncertain') {
+      try {
+        const token = localStorage.getItem('gepato_token') || '';
+        const r = await fetch(`/api/voice/${rec.id}/label`, {
+          method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+          body: JSON.stringify({ label: labelType==='he' ? Math.max(1, State.selectedGrade>=2 ? 2 : 1) : 0,
+                                 child_pugh_class: rec.child_pugh || 'B',
+                                 notes: `West-Haven ${State.selectedGrade}. ${note}`.trim() })
+        });
+        if (!r.ok) { showToast('Saqlanmadi: server xatosi ('+r.status+')'); rec.label=null; return; }
+      } catch(e) { showToast('Saqlanmadi: server bilan aloqa yo’q'); rec.label=null; return; }
+    }
 
     const msgs = {
-      he:        '🔴 HE tasdiqlandi — o'quv ma'lumotiga qo'shildi',
-      no_he:     '✅ HE yo'q — belgilandi',
-      uncertain: '⚠️ Aniq emas — keyinroq qayta ko'riladi',
+      he:        '🔴 HE tasdiqlandi — o’quv ma’lumotiga qo’shildi',
+      no_he:     '✅ HE yo’q — belgilandi',
+      uncertain: '⚠️ Aniq emas — keyinroq qayta ko’riladi',
     };
     showToast(msgs[labelType]);
     this.updateStats();

@@ -56,6 +56,10 @@ class AnalyzeResponse(BaseModel):
     needs_labeling: bool
     alert_created: bool
     model_version: str
+    # Multimodal HE indeks (ovoz + oxirgi 7 kundagi tremor va kognitiv test)
+    he_index: float | None = None
+    he_risk_level: str | None = None
+    he_components: dict | None = None
 
 
 class LabelRequest(BaseModel):
@@ -103,45 +107,42 @@ async def upload_voice(
     await db.commit()
     await db.refresh(recording)
 
-    # Feature extraction (background)
-    background_tasks.add_task(
-        _extract_features_bg, recording.id, str(file_path), patient_id
-    )
-
-    # Darhol sifat tekshiruvi qaytarish
+    # Darhol sifat tekshiruvi (P1 AudioQualityPipeline). Ilgari bu yerda mavjud bo'lmagan
+    # extractor._compute_snr chaqirilardi -> har yuklash "unknown" va tahlil hech qachon tugamasdi.
+    from ml.audio_quality import get_audio_quality_pipeline
     try:
-        extractor = get_extractor()
-        # Tezkor sifat baholash — to'liq extraction emas
-        import librosa
-        y, sr = librosa.load(str(file_path), sr=16000, mono=True)
-        duration = len(y) / sr
-        snr = extractor._compute_snr(y, sr)
-        quality, notes = extractor._assess_quality(snr, duration)
-
-        recording.duration = duration
-        recording.sample_rate = sr
-        recording.snr_db = snr
-        recording.quality = quality
-        recording.quality_notes = notes
-        await db.commit()
-
-        return UploadResponse(
-            recording_id=recording.id,
-            quality=quality,
-            quality_notes=notes,
-            duration=round(duration, 2),
-            snr_db=round(snr, 2),
-            features_ready=False,
+        rep = await asyncio.to_thread(
+            get_audio_quality_pipeline().process, str(file_path), "sustained_vowel",
+            settings.MIN_AUDIO_DURATION_SEC, settings.MAX_AUDIO_DURATION_SEC,
         )
-    except Exception as e:
-        return UploadResponse(
-            recording_id=recording.id,
-            quality="unknown",
-            quality_notes=str(e),
-            duration=0,
-            snr_db=0,
-            features_ready=False,
-        )
+        passed, snr, duration = rep.passed, rep.ambient_snr_db, rep.final_duration_sec
+        notes = rep.block_reason or ("; ".join(rep.warnings) if rep.warnings else "OK")
+    except Exception as e:  # sifat moduli xatosi yozuvni to'xtatmasin
+        passed, snr, duration, notes = True, 0.0, 0.0, f"Sifat tekshiruvi o'tkazilmadi: {e}"
+
+    quality = models.AudioQuality.GOOD if passed and notes == "OK" else (
+        models.AudioQuality.POOR if passed else models.AudioQuality.FAILED)
+    recording.duration = duration
+    recording.sample_rate = 16000
+    recording.snr_db = snr
+    recording.quality = quality
+    recording.quality_notes = notes[:500]
+    if not passed:
+        recording.features_extracted = True          # tahlil kutib qolmasin — darhol sababini aytadi
+        recording.extraction_error = notes[:500]
+    await db.commit()
+
+    if passed:
+        background_tasks.add_task(_extract_features_bg, recording.id, str(file_path), patient_id)
+
+    return UploadResponse(
+        recording_id=recording.id,
+        quality=quality.value,
+        quality_notes=notes,
+        duration=round(duration, 2),
+        snr_db=round(snr, 2),
+        features_ready=False,
+    )
 
 
 @router.post("/analyze/{recording_id}", response_model=AnalyzeResponse)
@@ -175,6 +176,9 @@ async def analyze_recording(
         else:
             raise HTTPException(202, "Feature extraction hali tugamagan. Qayta urinib ko'ring.")
 
+    if rec.extraction_error:
+        raise HTTPException(422, f"Yozuv tahlil qilinmadi: {rec.extraction_error}")
+
     # Features
     result = await db.execute(
         select(models.AcousticFeatures).where(
@@ -198,7 +202,7 @@ async def analyze_recording(
 
     # Deviation
     extractor = get_extractor()
-    feat_dict = _acoustic_to_dict(feat)
+    feat_dict = {**(feat.extra_features or {}), **_acoustic_to_dict(feat)}
     deviation = extractor.compute_deviation(
         type("F", (), feat_dict)(), baseline
     ) if baseline else {}
@@ -211,11 +215,15 @@ async def analyze_recording(
         .order_by(models.Prediction.predicted_at.desc())
         .limit(7)
     )
-    history = [row[0] for row in history_result.fetchall()]
+    history = [row[0] for row in history_result.fetchall()][::-1]   # eskidan yangiga (_trend shuni kutadi)
 
-    # Bashorat
+    # Bashorat. Ilgari predict(feat_dict, history) — history disease_stage o'rniga tushib,
+    # trend hech qachon hisoblanmasdi.
     model = get_model()
-    pred_result = model.predict(feat_dict, history)
+    stage = getattr(patient, "disease_stage", None) or "unknown"
+    pred_result = model.predict(feat_dict, disease_stage=stage, history=history)
+
+    he = await _he_index(db, rec.patient_id, pred_result.risk_score, stage)
 
     # Prediction saqlash
     prediction = models.Prediction(
@@ -241,6 +249,18 @@ async def analyze_recording(
 
     await db.commit()
     await db.refresh(prediction)
+
+    if he:  # multimodal indeksni ham saqlaymiz (006-migratsiya ustunlari)
+        from sqlalchemy import text as _t
+        try:
+            await db.execute(_t(
+                "UPDATE predictions SET composite_he_index=:h, voice_component=:v, "
+                "tremor_component=:t, cognitive_component=:c WHERE id=:i"),
+                {"h": he["he_index"], "v": he["components"]["voice"], "t": he["components"]["tremor"],
+                 "c": he["components"]["cognitive"], "i": prediction.id})
+            await db.commit()
+        except Exception:
+            await db.rollback()
 
     # Alert (fon taskda)
     alert_created = False
@@ -270,6 +290,9 @@ async def analyze_recording(
         needs_labeling=pred_result.needs_labeling,
         alert_created=alert_created,
         model_version=pred_result.model_version,
+        he_index=he.get("he_index") if he else None,
+        he_risk_level=he.get("risk_level") if he else None,
+        he_components=he.get("components") if he else None,
     )
 
 
@@ -375,7 +398,6 @@ async def _extract_features_bg(recording_id: int, file_path: str, patient_id: in
     async with async_session() as db:
         try:
             extractor = get_extractor()
-            result = extractor.extract(file_path)
 
             # Patient baseline
             patient = await db.get(models.Patient, patient_id)
@@ -386,6 +408,11 @@ async def _extract_features_bg(recording_id: int, file_path: str, patient_id: in
                     "shimmer_local": patient.baseline_shimmer,
                     "hnr":           patient.baseline_hnr,
                 }
+            stage = (getattr(patient, "disease_stage", None) if patient else None) or "unknown"
+            # Ilgari extractor.extract(file_path) — extract() audio massiv kutadi -> har doim xato.
+            # Praat/librosa CPU-og'ir: event loop'ni bloklamasin.
+            result = await asyncio.to_thread(
+                extractor.extract_from_file, file_path, "sustained_vowel", stage, baseline or None)
 
             # Deviation hisoblash
             result_dict = {
@@ -416,13 +443,12 @@ async def _extract_features_bg(recording_id: int, file_path: str, patient_id: in
             )
             db.add(feat)
 
-            # Recording yangilash
+            feat.extra_features = {k: v for k, v in result.to_dict().items()
+                                   if isinstance(v, (int, float)) and not isinstance(v, bool)}
+
+            # Recording yangilash (snr/duration/quality upload paytida yozilgan)
             rec = await db.get(models.VoiceRecording, recording_id)
             rec.features_extracted = True
-            rec.snr_db = result.snr_db
-            rec.duration = result.duration
-            rec.quality = result.quality
-            rec.quality_notes = result.quality_notes
 
             await db.commit()
 
@@ -431,13 +457,21 @@ async def _extract_features_bg(recording_id: int, file_path: str, patient_id: in
                 rec = await db2.get(models.VoiceRecording, recording_id)
                 if rec:
                     rec.features_extracted = True
-                    rec.quality = "failed"
+                    rec.quality = models.AudioQuality.FAILED
                     rec.quality_notes = str(e)
                     rec.extraction_error = str(e)
                     await db2.commit()
         except Exception as e:
             import logging
-            logging.getLogger(__name__).error(f"BG extraction xatosi: {e}")
+            logging.getLogger(__name__).exception("BG extraction xatosi: %s", e)
+            # Tahlil 30 soniya behuda kutmasin — xatoni yozuvga belgilaymiz
+            async with async_session() as db2:
+                rec = await db2.get(models.VoiceRecording, recording_id)
+                if rec:
+                    rec.features_extracted = True
+                    rec.quality = models.AudioQuality.FAILED
+                    rec.extraction_error = f"Feature extraction xatosi: {e}"[:500]
+                    await db2.commit()
 
 
 async def _create_alert_bg(prediction_id, patient_id, doctor_id, pred):
@@ -496,6 +530,35 @@ async def _update_baseline_bg(patient_id: int):
         patient.baseline_computed = True
         patient.baseline_date     = datetime.utcnow()
         await db.commit()
+
+
+async def _he_index(db: AsyncSession, patient_id: int, voice_score: float, stage: str) -> dict:
+    """Ovoz + oxirgi 7 kundagi tremor va kognitiv natijadan HEScoreEngine indeksi.
+    Kognitiv ball 'yuqori = yaxshi' (1 = normal), engine esa xavf kutadi -> 1 - ball."""
+    from sqlalchemy import text
+    from ml.scoring import get_scoring_engine
+    try:
+        t = (await db.execute(text(
+            "SELECT tremor_score FROM tremor_readings WHERE patient_id=:p "
+            "AND recorded_at >= now() - interval '7 days' ORDER BY recorded_at DESC LIMIT 1"),
+            {"p": patient_id})).scalar()
+        c = (await db.execute(text(
+            "SELECT cognitive_score FROM cognitive_tests WHERE patient_id=:p "
+            "AND test_date >= now() - interval '7 days' ORDER BY test_date DESC LIMIT 1"),
+            {"p": patient_id})).scalar()
+        r = get_scoring_engine().compute(
+            voice_score=voice_score,
+            tremor_score=float(t) if t is not None else None,
+            cognitive_score=(1.0 - float(c)) if c is not None else None,
+            disease_stage=stage,
+        )
+        return {"he_index": r.total_he_index, "risk_level": r.risk_level,
+                "components": {"voice": r.voice_component, "tremor": r.tremor_component,
+                               "cognitive": r.cognitive_component}}
+    except Exception as e:  # indeks qo'shimcha — ovoz bashoratini to'xtatmasin
+        import logging
+        logging.getLogger(__name__).warning("HE indeks hisoblanmadi: %s", e)
+        return {}
 
 
 def _acoustic_to_dict(feat: models.AcousticFeatures) -> dict:

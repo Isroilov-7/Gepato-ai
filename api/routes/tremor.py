@@ -126,9 +126,16 @@ def extract_tremor_features(
 
     # ── Magnitude ─────────────────────────────────────────────────────────
     magnitude = np.sqrt(np.sum(arr ** 2, axis=1))
+    # Brauzer (DeviceMotion accelerationIncludingGravity) m/s² beradi — g ga o'tkazamiz
+    if float(np.mean(magnitude)) > 3.0:
+        arr = arr / 9.80665
+        magnitude = magnitude / 9.80665
 
-    # ── RMS amplitude ─────────────────────────────────────────────────────
-    rms_amplitude = float(np.sqrt(np.mean(magnitude ** 2)))
+    # ── RMS amplitude — faqat DINAMIK qism (gravitatsiyasiz) ──────────────
+    # Ilgari |a| ning to'liq RMS'i olinardi: tinch turgan telefon ham ~1 g (gravitatsiya)
+    # berib, sog'lom odam doim "high" tremor chiqardi.
+    dynamic = magnitude - float(np.mean(magnitude))
+    rms_amplitude = float(np.sqrt(np.mean(dynamic ** 2)))
 
     # ── Stability score ───────────────────────────────────────────────────
     mag_mean = float(np.mean(magnitude)) + 1e-10
@@ -140,7 +147,7 @@ def extract_tremor_features(
     tremor_power_8_12  = 0.0
 
     try:
-        z_axis = arr[:, 2]
+        z_axis = dynamic          # gravitatsiyasiz magnituda (telefon holatidan mustaqil)
         sample_rate_hz = len(samples) / max(duration_sec, 0.1)
 
         # 50 Hz ga resample
@@ -162,7 +169,8 @@ def extract_tremor_features(
 
             # Tremor power 8–12 Hz
             mask_tremor = (fft_freqs >= TREMOR_FREQ_LOW) & (fft_freqs <= TREMOR_FREQ_HIGH)
-            total_power = float(fft_vals.sum()) + 1e-10
+            # DC (<0.5 Hz) jami quvvatdan chiqariladi — aks holda ulush doim ~0 bo'lardi
+            total_power = float(fft_vals[fft_freqs >= 0.5].sum()) + 1e-10
             tremor_power_8_12 = float(fft_vals[mask_tremor].sum() / total_power)
 
     except Exception as exc:
@@ -176,7 +184,10 @@ def extract_tremor_features(
     ))
 
     # Frequency component: 8–12 Hz da kuchli signal → patologik
-    freq_component = float(np.clip(tremor_power_8_12 * 3.0, 0.0, 1.0))
+    # Chastota ulushi faqat haqiqiy harakat bo'lsa ma'noli: tinch telefonda sensor shovqini
+    # 8–12 Hz ga ham tushib (~20%), sog'lom odamga "o'rta" tremor berardi -> amplituda bilan tortiladi.
+    amp_gate = float(np.clip(rms_amplitude / TREMOR_NORMAL_RMS, 0.0, 1.0))
+    freq_component = float(np.clip(tremor_power_8_12 * 3.0, 0.0, 1.0)) * amp_gate
 
     # Vazn: 60% RMS, 40% frequency power
     raw_score = 0.60 * rms_component + 0.40 * freq_component

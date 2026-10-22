@@ -34,19 +34,44 @@ celery_app.conf.update(
 )
 
 
+def _task_session():
+    """Har task chaqiruvi o'z event loop'ida ishlaydi — umumiy engine pool'i boshqa loop'ga
+    bog'langan bo'lib 'attached to a different loop' xatosi berardi (admin retrain serverni uzardi).
+    NullPool: ulanish loop'lar orasida qayta ishlatilmaydi."""
+    from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
+    from sqlalchemy.pool import NullPool
+    eng = create_async_engine(settings.DATABASE_URL, poolclass=NullPool)
+    return eng, async_sessionmaker(eng, expire_on_commit=False)
+
+
+def _run_async(coro_factory):
+    import asyncio
+    eng, Session = _task_session()
+
+    async def _wrap():
+        try:
+            return await coro_factory(Session)
+        finally:
+            await eng.dispose()
+
+    loop = asyncio.new_event_loop()
+    try:
+        return loop.run_until_complete(_wrap())
+    finally:
+        loop.close()
+
+
 @celery_app.task(name="core.tasks.nightly_retrain")
 def nightly_retrain():
     """
     Har kecha yangi labeled datalar bilan qayta trening.
     """
-    import asyncio
-    from db.database import async_session
     from db.models import AcousticFeatures
     from sqlalchemy import select
     import pandas as pd
     from ml.model import get_model, FEATURE_NAMES
 
-    async def _run():
+    async def _run(async_session):
         async with async_session() as db:
             # Ishlatilmagan labeled featurelar
             result = await db.execute(
@@ -64,7 +89,10 @@ def nightly_retrain():
             # DataFrame
             rows = []
             for f in new_feats:
-                row = {name: getattr(f, name, 0) or 0 for name in FEATURE_NAMES if not name.startswith("mfcc")}
+                extra = f.extra_features or {}
+                row = {name: (getattr(f, name, None) if getattr(f, name, None) is not None
+                              else extra.get(name, 0)) or 0
+                       for name in FEATURE_NAMES if not name.startswith("mfcc")}
                 mfcc = f.mfcc or [0] * 13
                 for i in range(6):
                     row[f"mfcc_{i}"] = mfcc[i] if i < len(mfcc) else 0
@@ -75,19 +103,17 @@ def nightly_retrain():
             model = get_model()
             train_result = model.retrain(df)
 
-            if train_result["success"]:
-                # used_in_training = True qilib belgilash
+            # retrain() TrainResult (dataclass) qaytaradi — ilgari dict deb o'qilardi
+            if train_result.success:
                 for f in new_feats:
                     f.used_in_training = True
-                    f.model_version = train_result["metrics"]["version"]
+                    f.model_version = train_result.version
                 await db.commit()
 
-            return train_result
+            return {"success": train_result.success, "version": train_result.version,
+                    "auc_roc": train_result.auc_roc, "reason": train_result.reason}
 
-    loop = asyncio.new_event_loop()
-    result = loop.run_until_complete(_run())
-    loop.close()
-    return result
+    return _run_async(_run)
 
 
 @celery_app.task(name="core.tasks.check_trends")
@@ -96,10 +122,7 @@ def check_trends():
     Barcha faol bemorlarning trendini tekshirib,
     zarur bo'lsa alert yaratadi.
     """
-    import asyncio
-
-    async def _run():
-        from db.database import async_session
+    async def _run(async_session):
         from db.models import Patient, Prediction, Alert, RiskLevel
         from sqlalchemy import select
         from datetime import datetime, timedelta
@@ -128,8 +151,9 @@ def check_trends():
                 if len(scores) < 2:
                     continue
 
-                # Deterioration aniqlash: 3 kun ketma-ket oshish
-                if all(scores[i] < scores[i+1] for i in range(len(scores)-1)):
+                # Deterioration: scores yangidan eskiga tartiblangan -> har yangi skor oldingisidan katta.
+                # (Ilgari '<' edi — bu yaxshilanishni bildirardi va alert HECH QACHON chiqmasdi.)
+                if all(scores[i] > scores[i+1] for i in range(len(scores)-1)):
                     slope = scores[0] - scores[-1]
                     if slope > 0.1 and patient.doctor_id:
                         alert = Alert(
@@ -150,7 +174,4 @@ def check_trends():
             await db.commit()
             return {"alerts_created": alerts_created, "patients_checked": len(patients)}
 
-    loop = asyncio.new_event_loop()
-    result = loop.run_until_complete(_run())
-    loop.close()
-    return result
+    return _run_async(_run)

@@ -850,12 +850,12 @@ const App = {
       if (maxDb > -10) {
         badge.className='status-badge badge-block'; icon.textContent='✕';
         text.textContent='Shovqin juda baland'; 
-        advice.textContent='Tinchroq joyga o'ting va qayta tekshiring.';
+        advice.textContent='Tinchroq joyga o’ting va qayta tekshiring.';
         contBtn.disabled = true;
       } else if (maxDb > -20) {
         badge.className='status-badge badge-warn'; icon.textContent='⚠';
         text.textContent='Shovqin yuqoriroq'; 
-        advice.textContent='Yaxshiroq natija uchun tinchroq joyda o'tkazing.';
+        advice.textContent='Yaxshiroq natija uchun tinchroq joyda o’tkazing.';
         contBtn.disabled = false;
       } else {
         badge.className='status-badge badge-ok'; icon.textContent='✓';
@@ -922,7 +922,7 @@ const App = {
     async toggleA() {
       const btn = document.getElementById('btn-record-a');
       if (!this.mediaRec || this.mediaRec.state !== 'recording') {
-        btn.textContent = '⏹ To'xtatish';
+        btn.textContent = '⏹ To’xtatish';
         btn.className = 'btn btn-danger';
         await this._startRec(
           document.getElementById('voice-timer-a'),
@@ -935,7 +935,7 @@ const App = {
               document.getElementById('voice-task-a').classList.add('hidden');
               document.getElementById('voice-task-b').classList.remove('hidden');
               document.getElementById('voice-stage-title').textContent = 'Ovoz yozuvi (2/2)';
-              document.getElementById('voice-stage-sub').textContent = 'Matnni o'qib bering';
+              document.getElementById('voice-stage-sub').textContent = 'Matnni o’qib bering';
             }, 800);
           }
         );
@@ -951,7 +951,7 @@ const App = {
     async toggleB() {
       const btn = document.getElementById('btn-record-b');
       if (!this.mediaRec || this.mediaRec.state !== 'recording') {
-        btn.textContent = '⏹ To'xtatish';
+        btn.textContent = '⏹ To’xtatish';
         btn.className = 'btn btn-danger';
         await this._startRec(
           document.getElementById('voice-timer-b'),
@@ -1207,7 +1207,7 @@ const App = {
       const rms = Math.sqrt(State.tremorSamples.reduce((s,v)=>s+v.x*v.x,0)/State.tremorSamples.length);
       State.tremorScore = Math.min(1, rms * 6);
       document.getElementById('btn-tremor-done').classList.remove('hidden');
-      showToast('Tremor o'lchandi ✓');
+      showToast('Tremor o’lchandi ✓');
     }
   },
 
@@ -1263,9 +1263,9 @@ const App = {
       if (lvl !== 'low') {
         document.getElementById('clinical-action-card').style.display = '';
         const actions = {
-          medium:   'Kuzatuvni davom ettiring. 3 kun ichida takroriy tekshiruv o'tkazing.',
-          high:     'Shifokoringiz bilan imkon qadar tezroq bog'laning. Ammiak va ALT/AST tahlili tavsiya.',
-          critical: 'DARHOL klinik baholash kerak. Kasalxona qabul bo'limlari bilan bog'laning.',
+          medium:   'Kuzatuvni davom ettiring. 3 kun ichida takroriy tekshiruv o’tkazing.',
+          high:     'Shifokoringiz bilan imkon qadar tezroq bog’laning. Ammiak va ALT/AST tahlili tavsiya.',
+          critical: 'DARHOL klinik baholash kerak. Kasalxona qabul bo’limlari bilan bog’laning.',
         };
         document.getElementById('clinical-action-text').textContent = actions[lvl] || '';
       }

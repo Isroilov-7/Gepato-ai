@@ -654,7 +654,7 @@ function renderDash(){
       <div class="ch-card">
         <div class="ch-title">Stroop kognitiv test</div>
         <div class="ch-wrap"><canvas id="strCh"></canvas></div>
-        <div class="ch-stat">O'rtacha kechikish: ${Math.round(p.stroop.reduce((a,b)=>a+b,0)/p.stroop.length)}ms</div>
+        <div class="ch-stat">O’rtacha kechikish: ${Math.round(p.stroop.reduce((a,b)=>a+b,0)/p.stroop.length)}ms</div>
       </div>
       <div class="ch-card">
         <div class="ch-title">Mikro-tremor (asteriksis)</div>
@@ -663,7 +663,7 @@ function renderDash(){
       </div>
     </div>
     <div class="trad">
-      <h3>Tibbiy ma'lumotlar</h3>
+      <h3>Tibbiy ma’lumotlar</h3>
       <div class="trad-g">
         <div><div class="trad-lbl">Laktuloza dozasi</div><input class="trad-inp" value="${p.lactulose}" readonly></div>
         <div><div class="trad-lbl">Ammiak darajasi (μg/dL)</div><input class="trad-inp" value="${p.ammonia}" readonly></div>
@@ -673,7 +673,7 @@ function renderDash(){
     <div class="actions">
       <h3>Harakatlar</h3>
       <div class="act-row">
-        <button class="act-btn ab-blue" onclick="callPt()">📞 Qo'ng'iroq</button>
+        <button class="act-btn ab-blue" onclick="callPt()">📞 Qo’ng’iroq</button>
         <button class="act-btn ab-yell" onclick="adjMed()">💊 Dori sozlash</button>
         <button class="act-btn ab-green" onclick="markRes()">✅ Yaxshi deb belgilash</button>
       </div>

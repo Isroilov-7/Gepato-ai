@@ -93,6 +93,7 @@ def _patient_detail(p: models.Patient) -> dict:
         "albumin": p.albumin,
         "inr": p.inr,
         "lactulose_dose": p.lactulose_dose,
+        "ammonia_level": p.ammonia_level,
         "rifaximin": p.rifaximin,
         "encephalopathy_grade": p.encephalopathy_grade,
         "notes": p.notes,

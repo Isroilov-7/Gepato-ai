@@ -41,6 +41,11 @@ class TrainResult:
     per_stratum_auc:dict=field(default_factory=dict)
     reason:str=""; model_path:str=""
 
+def _ver_key(f:Path)->tuple:
+    """model_v1.10.pkl > model_v1.9.pkl (matn bo'yicha saralash v1.10 ni eski deb hisoblardi)."""
+    import re
+    return tuple(int(x) for x in re.findall(r"\d+",f.stem)) or (0,)
+
 class StratifiedHEModel:
     def __init__(self,model_dir:str="models"):
         self.model_dir=Path(model_dir); self.model_dir.mkdir(exist_ok=True)
@@ -120,7 +125,7 @@ class StratifiedHEModel:
             test_samples=len(Xte),feature_importances=fi,per_stratum_auc=ps,model_path=str(mp))
 
     def _load_or_pretrain(self):
-        saved=sorted(self.model_dir.glob("model_v*.pkl"),reverse=True)
+        saved=sorted(self.model_dir.glob("model_v*.pkl"),key=_ver_key,reverse=True)
         if saved:
             try:
                 d=joblib.load(str(saved[0]))
@@ -185,12 +190,18 @@ class StratifiedHEModel:
             sv=sv[0]
             sd={n:round(float(v),4) for n,v in zip(FEATURE_NAMES,sv)}
             sf=sorted(sd.items(),key=lambda x:abs(x[1]),reverse=True)[:4]
-            lbs={"jitter_local":"Jitter","shimmer_local":"Shimmer","hnr":"HNR",
-                 "speech_rate":"Nutq tezligi","tremor_index":"Tremor",
-                 "jitter_deviation":"Jitter og'ishi","composite_deviation":"Umumiy og'ish",
-                 "dvb":"Voice Breaks","mean_pause_duration":"Pauza",
-                 "articulation_rate":"Artikulyatsiya","f0_slope":"F0 trend"}
-            tf=[{"feature":n,"label":lbs.get(n,n),"contribution":round(abs(v)*100,1),
+            lbs={"jitter_local":"Jitter","jitter_ppq5":"Jitter (PPQ5)","shimmer_local":"Shimmer",
+                 "shimmer_apq11":"Shimmer (APQ11)","hnr":"HNR","nhr":"NHR",
+                 "speech_rate":"Nutq tezligi","tremor_index":"Ovoz tremori",
+                 "jitter_deviation":"Jitter og'ishi","shimmer_deviation":"Shimmer og'ishi",
+                 "hnr_deviation":"HNR og'ishi","composite_deviation":"Umumiy og'ish",
+                 "dvb":"Ovoz uzilishlari","spi":"Yumshoq fonatsiya (SPI)","mean_pause_duration":"Pauza davomiyligi",
+                 "pause_rate":"Pauzalar soni","pause_to_speech_ratio":"Pauza/nutq nisbati",
+                 "articulation_rate":"Artikulyatsiya","f0_mean":"F0 o'rtacha","f0_std":"F0 tebranishi",
+                 "f0_range":"F0 diapazoni","f0_slope":"F0 trend","voiced_fraction":"Ovozli ulush"}
+            # Ulush = barcha SHAP mutlaq qiymatlari ichidagi foiz (ilgari |shap|*100 — 146% kabi chiqardi)
+            tot=sum(abs(v) for v in sd.values())+1e-10
+            tf=[{"feature":n,"label":lbs.get(n,n),"contribution":round(abs(v)/tot*100,1),
                  "direction":"oshirdi" if v>0 else "kamaytirdi",
                  "raw_value":round(float(features.get(n,0)),3)} for n,v in sf]
             pts=[f"{f['label']} ({f['contribution']:.0f}%)" for f in tf[:3]]
@@ -219,7 +230,15 @@ class StratifiedHEModel:
         except: return "v1.1"
 
 _model:Optional[StratifiedHEModel]=None
+_model_file:Optional[str]=None
+def _newest_model_file()->Optional[str]:
+    fs=sorted(Path("models").glob("model_v*.pkl"),key=_ver_key)
+    return str(fs[-1]) if fs else None
 def get_model()->StratifiedHEModel:
-    global _model
-    if _model is None: _model=StratifiedHEModel()
+    """Celery worker qayta o'qitgan yangi model faylini API ham avtomatik oladi
+    (ilgari API restart qilinmaguncha eski model ishlardi)."""
+    global _model,_model_file
+    newest=_newest_model_file()
+    if _model is None or (newest and newest!=_model_file):
+        _model=StratifiedHEModel(); _model_file=newest
     return _model
