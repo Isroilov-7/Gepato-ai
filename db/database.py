@@ -8,8 +8,10 @@ from db.models import Base
 engine = create_async_engine(
     settings.DATABASE_URL,
     echo=settings.DEBUG,
-    pool_size=10,
-    max_overflow=20,
+    # Bitta server, Postgres 256 MB chegarada — ulanishlar soni kichik (api 1 worker)
+    pool_size=5,
+    max_overflow=5,
+    pool_pre_ping=True,
 )
 
 async_session = async_sessionmaker(engine, expire_on_commit=False)

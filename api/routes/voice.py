@@ -30,6 +30,7 @@ ALLOWED_TYPES = {
 }
 UPLOAD_DIR = Path(settings.UPLOAD_DIR)
 UPLOAD_DIR.mkdir(exist_ok=True)
+AUDIO_EXTS = {".wav", ".webm", ".ogg", ".oga", ".mp3", ".m4a", ".mp4", ".aac", ".flac", ".3gp", ".amr"}
 
 
 # ── Schemas ─────────────────────────────────────────────
@@ -89,7 +90,9 @@ async def upload_voice(
         raise HTTPException(413, f"Fayl hajmi {settings.MAX_AUDIO_SIZE_MB}MB dan oshmasin")
 
     # Saqlash
-    ext = Path(file.filename or "audio.wav").suffix or ".wav"
+    ext = Path(file.filename or "audio.wav").suffix.lower()
+    if ext not in AUDIO_EXTS:  # nom foydalanuvchidan — faqat ma'lum audio kengaytmalari
+        ext = ".wav"
     filename = f"p{patient_id}_{uuid.uuid4().hex[:8]}{ext}"
     file_path = UPLOAD_DIR / filename
 

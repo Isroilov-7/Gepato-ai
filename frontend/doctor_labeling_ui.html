@@ -334,10 +334,27 @@
         if (r.ok) {
           const data = await r.json();
           if (data.items && data.items.length) { State.demo = false; return data.items; }
+        } else if (r.status === 401 || r.status === 403) {
+          // Navbat faqat kirgan shifokorga — kirish sahifasiga havola (demo baribir ko'rinadi)
+          if (r.status === 401) localStorage.removeItem('gepato_token');
+          showLoginHint(r.status === 403 ? "Bu hisobda belgilashga ruxsat yo'q" : "Jonli navbat uchun shifokor sifatida kiring");
         }
       } catch(e) { console.warn('API unavailable, using demo data', e); }
       State.demo = true;
       return JSON.parse(JSON.stringify(DEMO_QUEUE));
+    }
+    function showLoginHint(msg) {
+      if (document.getElementById('login-hint')) return;
+      const d = document.createElement('div');
+      d.id = 'login-hint';
+      d.style.cssText = 'position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:50;background:#FEF3C7;' +
+        'color:#92400E;border:1px solid #FDE68A;border-radius:10px;padding:10px 14px;font:600 13px system-ui,sans-serif;' +
+        'box-shadow:0 4px 16px rgba(0,0,0,.12);max-width:calc(100vw - 32px)';
+      d.textContent = msg + ' · namunaviy ma\'lumot ko\'rsatilmoqda. ';
+      const a = document.createElement('a');
+      a.href = '/#kirish'; a.textContent = 'Kirish →'; a.style.color = '#1A56DB';
+      d.appendChild(a);
+      document.body.appendChild(d);
     }
     // DEMO RECORDS fallback — Real app: replace with empty []
 // ═══════════════════════════════════════════════════════════

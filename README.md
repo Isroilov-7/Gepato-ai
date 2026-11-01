@@ -1,13 +1,19 @@
 # Gepato-AI v2.0 — Ishga Tushirish
 
-## Tezkor boshlash
+## Serverga joylash
+Bitta buyruq (NafasNazorat bilan bir xil tartib): **[deploy/README.md](deploy/README.md)** —
+`sudo bash deploy/install.sh gepato.plagiatx.uz <email>`.
+
+## Lokal ishga tushirish
 ```bash
-cp .env.example .env   # ANTHROPIC_API_KEY kiriting
-docker-compose up --build
-# API: http://localhost:8000/docs
-# Bemor: http://localhost:8000/patient
-# Labeling: http://localhost:8000/doctor/labeling
+cp .env.example .env
+docker compose up --build
+# Sayt: http://127.0.0.1:3200   API sxema: http://127.0.0.1:3200/docs (faqat development)
+# Bemor: /patient   Labeling: /doctor/labeling
+# Kirish: .env dagi BOOTSTRAP_ADMIN_EMAIL / BOOTSTRAP_ADMIN_PASSWORD
+docker compose exec -T api python scripts/selfcheck.py
 ```
+API faqat kirgan shifokor/admin uchun; ro'yxatdan o'tkazish — faqat admin (`scripts/create_user.py`).
 
 ## Modullar holati
 | Modul | Holat |

@@ -18,6 +18,7 @@ celery_app.conf.update(
     task_serializer="json",
     accept_content=["json"],
     result_expires=3600,
+    broker_connection_retry_on_startup=True,  # redis konteyneri kechroq tursa ham worker kutadi
     timezone="Asia/Tashkent",
     beat_schedule={
         # Har kecha 02:00 — retrain

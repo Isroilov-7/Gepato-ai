@@ -349,6 +349,32 @@ body.demo .demo-pill{display:inline-block}
   .adm-stats{grid-template-columns:1fr 1fr}
   .adm-grid2{grid-template-columns:1fr}
 }
+@media(max-width:600px){
+  /* Telefon: shifokor paneli tepa qatori va bemor sarlavhasi ekranga sig'sin (gorizontal scroll yo'q) */
+  .d-topbar{flex-wrap:wrap;gap:10px;padding:12px 16px}
+  .d-topbar h1{font-size:17px}
+  .d-topbar-r{flex-wrap:wrap;gap:8px}
+  .back-btn{padding:7px 12px;font-size:13px}
+  .pt-hdr{padding:18px 16px}
+  .pt-hdr-top{flex-wrap:wrap;gap:10px}
+  .pt-name{font-size:24px}
+  .pt-badge{white-space:normal;font-size:14px;padding:10px 14px}
+}
+/* Shifokor kirishi (hisobni admin ochadi; demo uchun shart emas) */
+.lm-wrap{position:fixed;inset:0;z-index:100;background:rgba(17,24,39,.45);display:flex;align-items:center;justify-content:center;padding:16px}
+.lm-wrap[hidden]{display:none}
+.lm{background:#fff;border-radius:14px;padding:22px;width:100%;max-width:360px;box-shadow:0 20px 50px rgba(0,0,0,.2);display:flex;flex-direction:column;gap:12px}
+.lm h2{font-size:17px;margin:0}
+.lm label{display:flex;flex-direction:column;gap:6px;font-size:13px;color:#374151;font-weight:600}
+.lm input{font-size:16px;padding:10px 12px;border:1px solid #D1D5DB;border-radius:8px}
+.lm-err{color:#B91C1C;font-size:13px;min-height:1em}
+.lm-row{display:flex;gap:8px}
+.lm-row button{flex:1;padding:11px;border-radius:8px;border:0;font-weight:600;font-size:14px;cursor:pointer}
+.lm-go{background:#1A56DB;color:#fff}.lm-go:disabled{opacity:.6}
+.lm-cancel{background:#F3F4F6;color:#111827}
+.lm-note{font-size:12px;color:#6B7280;margin:0}
+.auth-chip{font-size:12px;color:#065F46;background:#ECFDF5;border:1px solid #A7F3D0;border-radius:999px;padding:4px 10px;white-space:nowrap}
+.auth-chip[hidden]{display:none}
 </style>
 </head>
 <body>
@@ -390,6 +416,9 @@ body.demo .demo-pill{display:inline-block}
     <h1>Gepato-AI — Shifokor Paneli <span class="demo-pill">Demo rejim · namunaviy ma'lumotlar</span></h1>
     <div class="d-topbar-r">
       <div class="icon-btn" onclick="showToast('🔔','3 ta yuqori xavf','Aliyev, Karimov va Rustamov — 24 soat ichida ko\'rib chiqing')">🔔<div class="notif-dot"></div></div>
+      <span class="auth-chip" id="authChip" hidden></span>
+      <a class="back-btn" id="labLink" href="/doctor/labeling" hidden style="text-decoration:none">Belgilash navbati</a>
+      <button class="back-btn" id="authBtn" onclick="authClick()">Kirish</button>
       <button class="back-btn" onclick="go('landing')">← Chiqish</button>
     </div>
   </div>
@@ -549,6 +578,21 @@ body.demo .demo-pill{display:inline-block}
   </div>
 </div>
 
+<!-- SHIFOKOR KIRISHI -->
+<div class="lm-wrap" id="loginModal" hidden onclick="if(event.target===this)closeLogin()">
+  <form class="lm" onsubmit="doLogin(event)" autocomplete="on">
+    <h2>Shifokor kirishi</h2>
+    <label>Email<input id="lmEmail" type="email" autocomplete="username" required></label>
+    <label>Parol<input id="lmPw" type="password" autocomplete="current-password" required></label>
+    <div class="lm-err" id="lmErr" role="alert"></div>
+    <div class="lm-row">
+      <button type="button" class="lm-cancel" onclick="closeLogin()">Bekor</button>
+      <button type="submit" class="lm-go" id="lmGo">Kirish</button>
+    </div>
+    <p class="lm-note">Hisobni klinika admini ochadi. Namunaviy (demo) panelni ko'rish uchun kirish shart emas.</p>
+  </form>
+</div>
+
 <!-- TOAST -->
 <div class="toast" id="toastEl">
   <div class="t-title" id="tTitle"></div>
@@ -682,7 +726,7 @@ function renderDash(){
       <div class="ai-hdr">
         <div class="ai-av">🧠</div>
         <div><div class="ai-name">Atlas — Klinik Tahlil</div></div>
-        <div class="ai-model">${token?'jonli':'demo'}</div>
+        <div class="ai-model">${selPt.real?'jonli':'demo'}</div>
         <div class="ai-live" style="margin-left:8px"></div>
       </div>
       <div class="ai-msgs" id="aiMsgs">
@@ -722,7 +766,8 @@ async function adjMed(){
 }
 async function markRes(){
   try{
-    if(token){
+    // Faqat bazadagi haqiqiy bemor (real) — namunaviy bemorning id'si bazadagi BOSHQA bemorga tegmasin
+    if(token&&selPt.real){
       await fetch(`${API}/api/patients/${selPt.id}`,{
         method:'PATCH',headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
         body:JSON.stringify({notes:'Resolved by doctor'})
@@ -759,7 +804,7 @@ async function sendAI(){
   addThink();
   let resp;
   try{
-    if(token){
+    if(token&&selPt.real){
       const r=await fetch(`${API}/api/agents/atlas`,{
         method:'POST',headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
         body:JSON.stringify({question:msg,patient_id:selPt.id})
@@ -864,22 +909,56 @@ function showToast(icon,title,sub){
   clearTimeout(el._t);el._t=setTimeout(()=>el.classList.remove('show'),3500);
 }
 
-// ─── AUTO LOGIN (demo) ───
-async function autoLogin(){
-  try{
-    const r=await fetch(`${API}/api/auth/login`,{
-      method:'POST',
-      body:new URLSearchParams({username:'doctor@gepato.uz',password:'Doctor2025!'})
-    });
-    if(r.ok){const d=await r.json();token=d.access_token;localStorage.setItem('gepato_token',token);}
-  }catch(e){}
+// ─── KIRISH (ilgari kodda ochiq demo parol bilan avto-kirish edi) ───
+let me=null;
+function setAuthUI(){
+  const chip=document.getElementById('authChip'),btn=document.getElementById('authBtn'),lab=document.getElementById('labLink');
+  if(me){chip.textContent='✓ '+(me.full_name||me.email);chip.hidden=false;lab.hidden=false;btn.textContent='Hisobdan chiqish'}
+  else{chip.hidden=true;lab.hidden=true;btn.textContent='Kirish'}
 }
+async function checkToken(){
+  if(!token){me=null;return}
+  try{
+    const r=await fetch(`${API}/api/auth/me`,{headers:{'Authorization':'Bearer '+token}});
+    if(r.ok){me=await r.json();return}
+    if(r.status===401){token='';localStorage.removeItem('gepato_token')}  // muddati o'tgan / o'chirilgan hisob
+  }catch(e){}  // tarmoq xatosi — tokenni o'chirmaymiz
+  me=null;
+}
+function openLogin(){
+  document.getElementById('lmErr').textContent='';
+  document.getElementById('loginModal').hidden=false;
+  setTimeout(()=>document.getElementById('lmEmail').focus(),30);
+}
+function closeLogin(){document.getElementById('loginModal').hidden=true;if(location.hash==='#kirish')go('doctor')}
+function authClick(){
+  if(me){token='';me=null;localStorage.removeItem('gepato_token');setAuthUI();showToast('👋','Chiqdingiz','');return}
+  openLogin();
+}
+async function doLogin(e){
+  e.preventDefault();
+  const err=document.getElementById('lmErr'),btn=document.getElementById('lmGo');
+  err.textContent='';btn.disabled=true;
+  try{
+    const r=await fetch(`${API}/api/auth/login`,{method:'POST',body:new URLSearchParams({
+      username:document.getElementById('lmEmail').value.trim(),password:document.getElementById('lmPw').value})});
+    if(r.ok){
+      const d=await r.json();token=d.access_token;localStorage.setItem('gepato_token',token);
+      document.getElementById('lmPw').value='';
+      await checkToken();setAuthUI();closeLogin();
+      showToast('✅','Kirdingiz',(d.full_name||'')+' — belgilash navbati ochiq');
+    }else{
+      err.textContent=r.status===401?'Email yoki parol noto\'g\'ri':r.status===429?'Juda ko\'p urinish — birozdan keyin':'Xato: '+r.status;
+    }
+  }catch(x){err.textContent='Server bilan aloqa yo\'q'}
+  btn.disabled=false;
+}
+// Panelda bemorlar — namunaviy (demo); belgi doim ko'rinadi (kirgandan keyin ham)
+document.body.classList.add('demo');
+PTS.forEach(p=>{p.real=false});
 (async()=>{
-  let api=false;
-  try{const ctl=new AbortController();setTimeout(()=>ctl.abort(),2000);
-      const r=await fetch(`${API}/health`,{signal:ctl.signal});api=r.ok&&(await r.json()).status==='ok';}catch(e){}
-  if(api) await autoLogin();
-  if(!token) document.body.classList.add('demo');
+  await checkToken();setAuthUI();
+  if(location.hash==='#kirish'){go('doctor',true);openLogin()}
   if(document.getElementById('doctor').classList.contains('active')) renderDash();
 })();
 renderPtList();

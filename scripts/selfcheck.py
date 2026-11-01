@@ -2,7 +2,8 @@
 
     docker-compose exec api python scripts/selfcheck.py
 
-API konteyner ichida ishlaydi (http://127.0.0.1:8000). Har safar yangi sinov shifokori ochiladi,
+API konteyner ichida ishlaydi (http://127.0.0.1:8000). Admin (.env BOOTSTRAP_ADMIN_*) bilan kiradi,
+har safar yangi sinov shifokorini qo'shadi va oxirida o'chiradi (is_active=false),
 sinov bemori ("TEST tekshiruv") bitta — qayta ishlatiladi. Belgilash (label) va qayta o'qitish
 chaqirilmaydi: soxta yozuvlar modelni o'qitish ma'lumotiga tushmasin.
 """
@@ -58,18 +59,41 @@ for u in ["/health", "/", "/patient", "/doctor/labeling", "/vendor/chart.umd.js"
     r = req("GET", u)
     check(f"GET {u}", r.status_code == 200, str(r.status_code))
 
-print("\n2) Ro'yxatdan o'tish va kirish")
-email = f"selfcheck{int(time.time())}@gepato.uz"
-r = req("POST", "/api/auth/register", json={"email": email, "password": "Selfcheck2025!",
-                                            "full_name": "Selfcheck", "role": "doctor"})
-check("ro'yxatdan o'tish", r.status_code in (200, 201), str(r.status_code))
-r = req("POST", "/api/auth/login", data={"username": email, "password": "Selfcheck2025!"})
+print("\n2) Himoya: tokensiz kirish yopiq")
+for m, u in [("GET", "/api/patients/"), ("GET", "/api/admin/stats"), ("POST", "/api/agents/atlas"),
+             ("GET", "/api/predictions/labeling-queue"), ("GET", "/api/tremor/1/latest")]:
+    r = req(m, u, json={} if m == "POST" else None)
+    check(f"{m} {u} tokensiz -> 401", r.status_code == 401, str(r.status_code))
+r = req("POST", "/api/auth/register", json={"email": "x@x.uz", "password": "Selfcheck2025!",
+                                            "full_name": "X", "role": "admin"})
+check("tokensiz ro'yxat (admin bo'lib) -> 401", r.status_code == 401, str(r.status_code))
+
+print("\n3) Kirish: admin (.env BOOTSTRAP_ADMIN_*) -> shifokor qo'shadi")
+a_email, a_pw = os.environ.get("BOOTSTRAP_ADMIN_EMAIL", ""), os.environ.get("BOOTSTRAP_ADMIN_PASSWORD", "")
+r = req("POST", "/api/auth/login", data={"username": a_email, "password": a_pw})
+atoken = r.json().get("access_token", "") if r.status_code == 200 else ""
+if not check("admin kirishi", bool(atoken), f"{r.status_code} (BOOTSTRAP_ADMIN_EMAIL/PASSWORD env'da bormi?)"):
+    sys.exit(1)
+HA = {"Authorization": f"Bearer {atoken}"}
+email = f"selfcheck{int(time.time())}@gepato.local"
+dpw = "Selfcheck-" + os.urandom(6).hex()
+r = req("POST", "/api/auth/register", headers=HA, json={"email": email, "password": dpw,
+                                                         "full_name": "Selfcheck", "role": "doctor"})
+check("admin shifokor qo'shdi", r.status_code in (200, 201), str(r.status_code))
+doc_id = r.json().get("id") if r.status_code in (200, 201) else None
+r = req("POST", "/api/auth/login", data={"username": email, "password": dpw})
 token = r.json().get("access_token", "") if r.status_code == 200 else ""
-check("kirish (token)", bool(token), str(r.status_code))
+check("shifokor kirishi (token)", bool(token), str(r.status_code))
 H = {"Authorization": f"Bearer {token}"}
 check("/api/auth/me", req("GET", "/api/auth/me", headers=H).status_code == 200)
+check("shifokor admin bo'limiga -> 403", req("GET", "/api/admin/stats", headers=H).status_code == 403)
+r = req("POST", "/api/auth/register", headers=H, json={"email": "y@y.uz", "password": "Selfcheck2025!",
+                                                        "full_name": "Y", "role": "admin"})
+check("shifokor admin qo'sha olmaydi -> 403", r.status_code == 403, str(r.status_code))
+check("noto'g'ri parol -> 401", req("POST", "/api/auth/login",
+                                    data={"username": email, "password": "notogri-parol"}).status_code == 401)
 
-print("\n3) Bemor")
+print("\n4) Bemor")
 r = req("GET", "/api/patients/?limit=500", headers=H)
 check("bemorlar ro'yxati", r.status_code == 200, str(r.status_code))
 items = r.json() if r.status_code == 200 else []
@@ -87,8 +111,10 @@ if not pid:
 check("bemor ma'lumoti", req("GET", f"/api/patients/{pid}", headers=H).status_code == 200)
 check("bemorni tahrirlash", req("PATCH", f"/api/patients/{pid}", headers=H,
                                 json={"ammonia_level": 96}).status_code == 200)
+check("ichki maydonni tahrirlash (id) -> 422", req("PATCH", f"/api/patients/{pid}", headers=H,
+                                                   json={"id": 999999}).status_code == 422)
 
-print("\n4) Tremor (telefon akselerometri)")
+print("\n5) Tremor (telefon akselerometri)")
 still = [{"x": random.gauss(0, .003), "y": random.gauss(0, .003), "z": 1 + random.gauss(0, .003), "t": i * 20}
          for i in range(500)]
 r = req("POST", f"/api/tremor/{pid}", headers=H, json={"samples": still, "duration_sec": 10})
@@ -101,7 +127,7 @@ check("9 Hz kuchli titroq -> yuqori", r.status_code == 200 and r.json().get("ris
       f"{r.json().get('risk_level')} {r.json().get('tremor_score')}")
 check("tremor tarixi", req("GET", f"/api/tremor/{pid}/history", headers=H).status_code == 200)
 
-print("\n5) Kognitiv test (Stroop + raqamlar)")
+print("\n6) Kognitiv test (Stroop + raqamlar)")
 cols = ["red", "blue", "green", "yellow"]
 st = [{"color": random.choice(cols), "word": random.choice(cols), "response": "red",
        "rt_ms": 700 + random.random() * 300, "correct": random.random() > .2} for _ in range(20)]
@@ -109,7 +135,7 @@ nct = [{"number": i + 1, "tapped_at_ms": (i + 1) * 1500, "correct": True} for i 
 r = req("POST", f"/api/cognitive/{pid}", headers=H, json={"stroop_trials": st, "nct_sequence": nct})
 check("kognitiv natija saqlandi", r.status_code in (200, 201), str(r.status_code))
 
-print("\n6) Ovoz tahlili (yuklash -> 23 belgi -> model -> HE indeksi)")
+print("\n7) Ovoz tahlili (yuklash -> 23 belgi -> model -> HE indeksi)")
 r = req("POST", f"/api/voice/upload/{pid}", headers=H, files={"file": ("v.wav", wav(), "audio/wav")})
 check("ovoz yuklash", r.status_code in (200, 201), f"{r.status_code} {r.text[:120]}")
 rid = r.json().get("recording_id") if r.status_code in (200, 201) else None
@@ -129,11 +155,11 @@ check("ovoz tarixi", req("GET", f"/api/voice/{pid}/history", headers=H).status_c
 check("bashoratlar", req("GET", f"/api/predictions/{pid}", headers=H).status_code == 200)
 check("belgilash navbati", req("GET", "/api/predictions/labeling-queue", headers=H).status_code == 200)
 
-print("\n7) Admin")
+print("\n8) Admin")
 for u in ["/api/admin/stats", "/api/admin/alerts", "/api/admin/model/versions"]:
-    check(u, req("GET", u, headers=H).status_code == 200)
+    check(u, req("GET", u, headers=HA).status_code == 200)
 
-print("\n8) AI agentlar (Atlas, Oracle)")
+print("\n9) AI agentlar (Atlas, Oracle)")
 ai_ok = True
 for agent in ("atlas", "oracle"):
     r = req("POST", f"/api/agents/{agent}", headers=H, json={"question": "Qisqa xulosa bering", "patient_id": pid})
@@ -143,6 +169,11 @@ for agent in ("atlas", "oracle"):
     else:
         ai_ok = False
         print(f"  DIQQAT {agent}: AI javob bermadi — {str(d.get('error') or r.text)[:160]}")
+
+if doc_id:  # sinov shifokori faol qolmasin (bazada izi qoladi, kira olmaydi)
+    req("PATCH", f"/api/auth/users/{doc_id}", headers=HA, json={"is_active": False})
+    check("sinov shifokori o'chirildi -> eski token 401",
+          req("GET", "/api/auth/me", headers=H).status_code == 401)
 
 ok, n = sum(results), len(results)
 print(f"\nJAMI: {ok}/{n} o'tdi" + ("" if ai_ok else "  (AI agentlar: kalit/balansni tekshiring — sayt demo javob beradi)"))

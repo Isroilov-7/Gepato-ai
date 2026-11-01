@@ -1,78 +1,111 @@
+# Gepato-AI — alohida compose loyihasi (PlagiatX va NafasNazorat'dan to'liq ajratilgan).
+# Serverda:  cd /opt/gepato && docker compose up -d --build   (birinchi marta: deploy/install.sh)
+#
+# Xotira chegaralari o'lchovdan (2026-11-01): api bo'sh 380 MB, ovoz tahlilidan keyin ~590 MB;
+# worker 2 jarayon ~130 MB. oom_score_adj — server xotirasi tugasa avval Gepato o'ladi, PlagiatX emas.
+# memswap_limit = mem_limit — swap'ni ham yemaydi.
+name: gepato
+
+x-app: &app
+  build: .
+  image: gepato:latest
+  restart: unless-stopped
+  env_file: .env
+  environment:
+    DATABASE_URL: postgresql+asyncpg://gepato:${POSTGRES_PASSWORD:?.env da POSTGRES_PASSWORD yo'q}@db:5432/gepato
+    REDIS_URL: redis://redis:6379/0
+    UPLOAD_DIR: /app/uploads
+  volumes:
+    - gepato_uploads:/app/uploads
+    - ./models:/app/models
+  security_opt: ["no-new-privileges:true"]
+  oom_score_adj: 800
+  logging:
+    driver: json-file
+    options: { max-size: "10m", max-file: "3" }
+
 services:
   api:
-    build: .
+    <<: *app
+    # Faqat hostdagi nginx ko'radi — tashqariga ochiq emas
     ports:
-      - "8001:8000"
-    environment:
-      - DATABASE_URL=postgresql+asyncpg://gepato:gepato@db:5432/gepato
-      - REDIS_URL=redis://redis:6379
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
-      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-2.5-flash}
-      - AI_PROVIDER=${AI_PROVIDER:-auto}
-      - SECRET_KEY=${SECRET_KEY:-change-me-in-production}
-      - ENVIRONMENT=${ENVIRONMENT:-development}
-    volumes:
-      - ./uploads:/app/uploads
-      - ./models:/app/models
+      - "127.0.0.1:3200:8000"
+    mem_limit: 900m
+    memswap_limit: 900m
+    cpus: 1.5
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=4)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
     depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    restart: unless-stopped
+      db: { condition: service_healthy }
+      redis: { condition: service_healthy }
 
   worker:
-    build: .
-    command: celery -A core.celery_app worker --loglevel=info -Q default,ml
-    environment:
-      - DATABASE_URL=postgresql+asyncpg://gepato:gepato@db:5432/gepato
-      - REDIS_URL=redis://redis:6379
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
-      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-2.5-flash}
-      - AI_PROVIDER=${AI_PROVIDER:-auto}
-    volumes:
-      - ./uploads:/app/uploads
-      - ./models:/app/models
+    <<: *app
+    command: celery -A core.celery_app worker --loglevel=info -Q default,ml --concurrency=1 --max-tasks-per-child=20
+    mem_limit: 512m
+    memswap_limit: 512m
+    cpus: 1.0
     depends_on:
-      - db
-      - redis
-    restart: unless-stopped
+      db: { condition: service_healthy }
+      redis: { condition: service_healthy }
 
   beat:
-    build: .
-    command: celery -A core.celery_app beat --loglevel=info
-    environment:
-      - DATABASE_URL=postgresql+asyncpg://gepato:gepato@db:5432/gepato
-      - REDIS_URL=redis://redis:6379
+    <<: *app
+    command: celery -A core.celery_app beat --loglevel=info -s /tmp/celerybeat-schedule
+    mem_limit: 160m
+    memswap_limit: 160m
+    cpus: 0.25
     depends_on:
-      - redis
-    restart: unless-stopped
+      redis: { condition: service_healthy }
 
   db:
     image: postgres:15-alpine
+    restart: unless-stopped
     environment:
       POSTGRES_DB: gepato
       POSTGRES_USER: gepato
-      POSTGRES_PASSWORD: gepato
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?.env da POSTGRES_PASSWORD yo'q}
+    # Kichik baza — kichik buferlar (standart 128 MB shared_buffers bu yerda ortiqcha)
+    command: postgres -c shared_buffers=32MB -c max_connections=40 -c work_mem=4MB -c effective_cache_size=96MB
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - gepato_pg:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U gepato"]
+      test: ["CMD-SHELL", "pg_isready -U gepato -d gepato"]
       interval: 5s
       timeout: 5s
-      retries: 5
-    restart: unless-stopped
+      retries: 10
+    mem_limit: 256m
+    memswap_limit: 256m
+    cpus: 0.5
+    security_opt: ["no-new-privileges:true"]
+    oom_score_adj: 800
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
 
   redis:
     image: redis:7-alpine
+    restart: unless-stopped
+    # Faqat Celery navbati va qisqa natijalar: diskka yozmaydi, 48 MB dan oshmaydi
+    command: redis-server --maxmemory 48mb --maxmemory-policy volatile-lru --save "" --appendonly no
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 3s
-      retries: 5
-    restart: unless-stopped
+      retries: 10
+    mem_limit: 80m
+    memswap_limit: 80m
+    cpus: 0.25
+    security_opt: ["no-new-privileges:true"]
+    oom_score_adj: 800
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
 
 volumes:
-  pgdata:
+  gepato_pg:
+  gepato_uploads:

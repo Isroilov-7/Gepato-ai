@@ -1,7 +1,7 @@
 """
 Gepato-AI v2.0 — FastAPI Application
 """
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
@@ -18,10 +18,19 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+problems = settings.production_problems()
+if problems:  # xato sozlangan server umuman ochilmasin (ochiq qolgandan ko'ra ishlamagani yaxshi)
+    raise RuntimeError("Production sozlamalari xato: " + "; ".join(problems))
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("🚀 Gepato-AI v2.0 ishga tushmoqda...")
     await init_db()
+    from db.database import async_session
+    from api.routes.auth import ensure_bootstrap_admin
+    async with async_session() as s:
+        await ensure_bootstrap_admin(s)
     from ml.model import get_model
     model = get_model()
     logger.info("✅ Model yuklandi: %s", model.version)
@@ -34,15 +43,21 @@ app = FastAPI(
     version=settings.VERSION,
     description="Multimodal Hepatic Encephalopathy Monitoring Platform",
     lifespan=lifespan,
+    # Productionda API sxemasi ochiq e'lon qilinmaydi (ENABLE_DOCS=true bilan yoqiladi)
+    docs_url="/docs" if (settings.ENABLE_DOCS or not settings.is_production) else None,
+    redoc_url=None,
+    openapi_url="/openapi.json" if (settings.ENABLE_DOCS or not settings.is_production) else None,
 )
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],   # Production: domenni cheklash
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# Frontend shu domendan — CORS kerak emas. Ilgari allow_origins=["*"] + credentials edi.
+if settings.cors_origins:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.cors_origins,
+        allow_credentials=False,  # token Authorization sarlavhasida, cookie yo'q
+        allow_methods=["GET", "POST", "PATCH", "DELETE"],
+        allow_headers=["Authorization", "Content-Type"],
+    )
 
 # ── Static files (frontend) ──────────────────────────────────────────────
 frontend_dir = Path(__file__).parent.parent / "frontend"
@@ -52,17 +67,22 @@ if frontend_dir.exists():
         app.mount("/vendor", StaticFiles(directory=str(frontend_dir / "vendor")), name="vendor")
 
 # ── Routes ────────────────────────────────────────────────────────────────
+# Bemor ma'lumoti va AI — faqat kirgan shifokor/admin; admin bo'limi — faqat admin.
+# Himoya router darajasida: shu routerlarga qo'shilgan yangi endpoint ham tokensiz ochilmaydi.
 from api.routes import auth, patients, voice, predictions, admin, agents
 from api.routes import tremor, cognitive   # P4, P5 — yangi
+from api.security import require_admin, require_clinician
 
+CLIN = [Depends(require_clinician)]
 app.include_router(auth.router,        prefix="/api/auth",        tags=["Auth"])
-app.include_router(patients.router,    prefix="/api/patients",    tags=["Patients"])
-app.include_router(voice.router,       prefix="/api/voice",       tags=["Voice"])
-app.include_router(predictions.router, prefix="/api/predictions", tags=["Predictions"])
-app.include_router(agents.router,      prefix="/api/agents",      tags=["AI Agents"])
-app.include_router(admin.router,       prefix="/api/admin",       tags=["Admin"])
-app.include_router(tremor.router,                                  tags=["Tremor"])    # P4
-app.include_router(cognitive.router,                               tags=["Cognitive"]) # P5
+app.include_router(patients.router,    prefix="/api/patients",    tags=["Patients"],    dependencies=CLIN)
+app.include_router(voice.router,       prefix="/api/voice",       tags=["Voice"],       dependencies=CLIN)
+app.include_router(predictions.router, prefix="/api/predictions", tags=["Predictions"], dependencies=CLIN)
+app.include_router(agents.router,      prefix="/api/agents",      tags=["AI Agents"],   dependencies=CLIN)
+app.include_router(admin.router,       prefix="/api/admin",       tags=["Admin"],
+                   dependencies=[Depends(require_admin)])
+app.include_router(tremor.router,      tags=["Tremor"],    dependencies=CLIN)  # P4 (/api/tremor)
+app.include_router(cognitive.router,   tags=["Cognitive"], dependencies=CLIN)  # P5 (/api/cognitive)
 
 
 @app.get("/")
