@@ -99,12 +99,14 @@ CERT_OK=0
 # DNS yo'q bo'lsa certbot chaqirilmaydi: har muvaffaqiyatsiz urinish Let's Encrypt limitini yeydi (soatiga 5 ta)
 if [[ -z "$(getent ahostsv4 "$DOMAIN" | awk 'NR==1{print $1}')" ]]; then
   echo "  DNS'da $DOMAIN yo'q — certbot o'tkazib yuborildi."
-  echo "  Cloudflare -> DNS -> Add record: A, Name: ${DOMAIN%%.*}, IPv4: $(curl -4 -fsS --max-time 5 https://api.ipify.org 2>/dev/null || echo '<server IP>'), DNS only"
+  echo "  Cloudflare -> DNS -> Add record: A, Name: ${DOMAIN%%.*}, IPv4: $(curl -4 -fsS --max-time 5 https://api.ipify.org 2>/dev/null || echo '<server IP>'), Proxied (to'q sariq bulut)"
+  echo "  (DNS only ISHLAMAYDI: server 80/443 ni faqat Cloudflare'ga ochgan)"
 elif command -v certbot >/dev/null; then
   if certbot --nginx -d "$DOMAIN" --non-interactive --agree-tos -m "$EMAIL" --redirect; then
     CERT_OK=1
   else
-    echo "  certbot muvaffaqiyatsiz: domen DNS'i shu serverga yo'nalganini tekshirib, skriptni qayta ishga tushiring"
+    echo "  certbot muvaffaqiyatsiz. 'Timeout during connect' bo'lsa — Cloudflare yozuvi Proxied (to'q sariq) bo'lsin:"
+    echo "  server 80/443 ni faqat Cloudflare IP'lariga ochgan (to'g'ridan IP / sslip.io / DNS only ishlamaydi)."
   fi
 else
   echo "  certbot topilmadi: apt install -y certbot python3-certbot-nginx"

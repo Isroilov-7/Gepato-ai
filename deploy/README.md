@@ -28,8 +28,12 @@ xotira chegarasi, o'z nginx sayti, HTTPS, kunlik backup.
 
 ## O'rnatish
 
-**1. Cloudflare DNS** (plagiatx.uz zonasi): `A` yozuv — Name: `gepato`, IPv4: serverning IP manzili
-(plagiatx.uz bilan bir xil).
+**1. Cloudflare DNS** (plagiatx.uz zonasi): `A` yozuv — Name: `gepato`, IPv4: serverning IP manzili,
+Proxy status: **Proxied** (to'q sariq bulut, `nafas` kabi). "DNS only" ishlamaydi: server 80/443 portlarini
+faqat Cloudflare IP'lariga ochgan (certbot "Timeout during connect" deydi).
+
+Domen/DNS bo'lmasa ham o'zingiz ko'rishingiz mumkin (shifrlangan SSH tunnel, sayt boshqalarga ko'rinmaydi):
+kompyuteringizda `ssh -L 3200:127.0.0.1:3200 root@<server IP>` → brauzerda `http://localhost:3200`.
 
 **2. Kodni serverga olish** (bir marta):
 ```bash
