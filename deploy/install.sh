@@ -97,7 +97,12 @@ systemctl reload nginx
 say "4/6 HTTPS sertifikati (certbot)"
 CERT_OK=0
 # DNS yo'q bo'lsa certbot chaqirilmaydi: har muvaffaqiyatsiz urinish Let's Encrypt limitini yeydi (soatiga 5 ta)
-if [[ -z "$(getent ahostsv4 "$DOMAIN" | awk 'NR==1{print $1}')" ]]; then
+# Lokal kesh oldingi "yo'q" javobini 30 daqiqagacha saqlaydi — Let's Encrypt kabi Cloudflare (1.1.1.1) dan ham so'raymiz
+dns_found() {
+  [[ -n "$(getent ahostsv4 "$DOMAIN" | awk 'NR==1{print $1}')" ]] && return 0
+  command -v dig >/dev/null && [[ -n "$(dig +short +time=3 +tries=1 "$DOMAIN" A @1.1.1.1 | grep -E '^[0-9.]+$' | head -1)" ]]
+}
+if ! dns_found; then
   echo "  DNS'da $DOMAIN yo'q — certbot o'tkazib yuborildi."
   echo "  Cloudflare -> DNS -> Add record: A, Name: ${DOMAIN%%.*}, IPv4: $(curl -4 -fsS --max-time 5 https://api.ipify.org 2>/dev/null || echo '<server IP>'), Proxied (to'q sariq bulut)"
   echo "  (DNS only ISHLAMAYDI: server 80/443 ni faqat Cloudflare'ga ochgan)"
