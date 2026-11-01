@@ -54,6 +54,12 @@ def wav(seconds=10, silent=False):
     return b
 
 
+# Build/restartdan keyin API modellarni yuklaguncha (~10 s) javob bermaydi — "0" xatolar chalg'itmasin
+for _ in range(45):
+    if req("GET", "/health").status_code == 200:
+        break
+    time.sleep(2)
+
 print("\n1) Server va sahifalar")
 for u in ["/health", "/", "/patient", "/doctor/labeling", "/vendor/chart.umd.js"]:
     r = req("GET", u)
