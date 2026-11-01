@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 client = anthropic.AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
 
 GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+THINK_HEADROOM = 4096
 
 
 # ── ATLAS — Klinik Tahlil ─────────────────────────────
@@ -193,6 +194,10 @@ async def _gemini(system: str, messages: list) -> tuple:
     gen = {"maxOutputTokens": 1500}
     if settings.GEMINI_MODEL.startswith("gemini-2.5"):
         gen["thinkingConfig"] = {"thinkingBudget": 0}  # 2.5 "o'ylash"ga token sarflamasin
+    else:
+        # 3.x modellar javobdan oldin "o'ylaydi" va bu maxOutputTokens'dan yeydi — javob chala qolardi
+        # (PlagiatX voqeasi, 2026-10-13). Javob uchun qo'shimcha joy.
+        gen["maxOutputTokens"] = 1500 + THINK_HEADROOM
     async with httpx.AsyncClient(timeout=60) as http:
         r = await http.post(
             GEMINI_URL.format(model=settings.GEMINI_MODEL),
@@ -204,7 +209,7 @@ async def _gemini(system: str, messages: list) -> tuple:
         raise RuntimeError(f"Gemini {r.status_code}: {r.text[:300]}")
     data = r.json()
     parts = (data.get("candidates") or [{}])[0].get("content", {}).get("parts", [])
-    text = "".join(x.get("text", "") for x in parts).strip()
+    text = "".join(x.get("text", "") for x in parts if not x.get("thought")).strip()  # o'ylash qismlari javobga kirmaydi
     if not text:
         raise RuntimeError(f"Gemini bo'sh javob: {str(data)[:300]}")
     return text, int(data.get("usageMetadata", {}).get("totalTokenCount", 0))

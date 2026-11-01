@@ -33,7 +33,7 @@ class Settings(BaseSettings):
     ANTHROPIC_API_KEY: str = ""
     CLAUDE_MODEL: str = "claude-sonnet-4-5"
     GEMINI_API_KEY: str = ""
-    GEMINI_MODEL: str = "gemini-2.5-flash"
+    GEMINI_MODEL: str = "gemini-3.6-flash"  # 2.5-flash yangi kalitlarga yopilgan (2026-11)
     AI_PROVIDER: str = "auto"  # auto | gemini | claude
 
     # Audio
