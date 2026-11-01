@@ -96,7 +96,11 @@ systemctl reload nginx
 
 say "4/6 HTTPS sertifikati (certbot)"
 CERT_OK=0
-if command -v certbot >/dev/null; then
+# DNS yo'q bo'lsa certbot chaqirilmaydi: har muvaffaqiyatsiz urinish Let's Encrypt limitini yeydi (soatiga 5 ta)
+if [[ -z "$(getent ahostsv4 "$DOMAIN" | awk 'NR==1{print $1}')" ]]; then
+  echo "  DNS'da $DOMAIN yo'q — certbot o'tkazib yuborildi."
+  echo "  Cloudflare -> DNS -> Add record: A, Name: ${DOMAIN%%.*}, IPv4: $(curl -4 -fsS --max-time 5 https://api.ipify.org 2>/dev/null || echo '<server IP>'), DNS only"
+elif command -v certbot >/dev/null; then
   if certbot --nginx -d "$DOMAIN" --non-interactive --agree-tos -m "$EMAIL" --redirect; then
     CERT_OK=1
   else
