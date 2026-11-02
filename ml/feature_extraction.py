@@ -123,9 +123,12 @@ class FeatureExtractor:
 
     # ── Praat features ────────────────────────────────────────────────
     def _jitter(self,s):
+        # Jitter Praat'da faqat PointProcess'dan olinadi. Ilgari call([s,pp], ...) edi -> "Command not
+        # available" xatosi, jitter_local/ppq5 HAR DOIM 0 bo'lib modelga tushardi (2026-11-02 topildi).
+        # Shimmer esa Sound+PointProcess talab qiladi (pastda, o'zgarmagan).
         pp=call(s,"To PointProcess (periodic, cc)",75,500)
-        lo=call([s,pp],"Get jitter (local)", 0,0,0.0001,0.02,1.3)
-        p5=call([s,pp],"Get jitter (ppq5)",  0,0,0.0001,0.02,1.3)
+        lo=call(pp,"Get jitter (local)", 0,0,0.0001,0.02,1.3)
+        p5=call(pp,"Get jitter (ppq5)",  0,0,0.0001,0.02,1.3)
         return round(float(lo)*100,4),round(float(p5)*100,4)
 
     def _shimmer(self,s):

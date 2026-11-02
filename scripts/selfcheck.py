@@ -157,7 +157,12 @@ sid = r.json().get("recording_id") if r.status_code in (200, 201) else None
 r2 = req("POST", f"/api/voice/analyze/{sid}", headers=H) if sid else None
 check("jim yozuv rad etiladi", r2 is not None and r2.status_code == 422,
       (r2.text[:100] if r2 is not None else "yuklanmadi"))
-check("ovoz tarixi", req("GET", f"/api/voice/{pid}/history", headers=H).status_code == 200)
+r = req("GET", f"/api/voice/{pid}/history", headers=H)
+check("ovoz tarixi", r.status_code == 200)
+hist = (r.json() or {}).get("data", []) if r.status_code == 200 else []
+# Regressiya: jitter Praat chaqiruvi xato bo'lib doim 0 edi (2026-11-02)
+check("jitter hisoblanadi (> 0)", bool(hist) and (hist[-1].get("jitter") or 0) > 0,
+      f"jitter={hist[-1].get('jitter') if hist else None}")
 check("bashoratlar", req("GET", f"/api/predictions/{pid}", headers=H).status_code == 200)
 check("belgilash navbati", req("GET", "/api/predictions/labeling-queue", headers=H).status_code == 200)
 
